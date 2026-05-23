@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "industrialjm"
+version = "0.1.0"
+description = "Estanques metálicos API 650 + estructuras industriales"
+requires-python = ">=3.11"
+dependencies = ["numpy>=1.26", "jmstructural-common"]
+
+[project.optional-dependencies]
+api = ["fastapi>=0.115", "uvicorn>=0.30", "pydantic>=2"]
+test = ["pytest>=8", "pytest-cov>=5"]
+
+[tool.setuptools.packages.find]
+include = ["industrialjm*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.uv.sources]
+jmstructural-common = { workspace = true }

@@ -1,0 +1,53 @@
+"""Tests para API 650 §E (masas Housner + pandeo manto)."""
+import pytest
+
+from industrialjm.tanks import (
+    TankGeometry,
+    housner_masses,
+    shell_axial_buckling_stress,
+)
+
+
+def test_W_l_kN_calculo():
+    g = TankGeometry(D_m=20, H_l_m=15, rho_l_kg_m3=1000)
+    # V = π·100·15 ≈ 4712.4 m³, W = ρ·V·g/1000 = 46217 kN
+    assert g.W_l_kN == pytest.approx(46217.0, rel=1e-3)
+
+
+def test_housner_suma_masas_consistente():
+    g = TankGeometry(D_m=20, H_l_m=15)
+    r = housner_masses(g, Sa_i=0.3, Sa_c=0.10)
+    # W_i + W_c ≤ W_l (no necesariamente suma exacta — diferencia es masa
+    # "rígida" del fondo)
+    assert r.W_i_kN > 0
+    assert r.W_c_kN > 0
+    assert r.W_i_kN + r.W_c_kN <= g.W_l_kN * 1.1
+
+
+def test_periodo_convectivo_es_fisico():
+    g = TankGeometry(D_m=20, H_l_m=15)
+    r = housner_masses(g, Sa_i=0.3, Sa_c=0.10)
+    # Para tanques medianos, T_c suele estar entre 3 y 8 s
+    assert 2.0 < r.T_c_s < 10.0
+
+
+def test_momento_volcante_no_negativo():
+    g = TankGeometry(D_m=20, H_l_m=15)
+    r = housner_masses(g, Sa_i=0.3, Sa_c=0.10)
+    assert r.M_overturn_kNm > 0
+
+
+def test_pandeo_manto_inversamente_proporcional_R():
+    sigma_grande = shell_axial_buckling_stress(
+        TankGeometry(D_m=10, H_l_m=10, t_shell_mm=6)
+    )
+    sigma_gigante = shell_axial_buckling_stress(
+        TankGeometry(D_m=30, H_l_m=10, t_shell_mm=6)
+    )
+    # σ_cr ∝ 1/R → estanque grande tiene σ_cr menor
+    assert sigma_grande > sigma_gigante
+
+
+def test_validacion_geometria():
+    with pytest.raises(ValueError):
+        TankGeometry(D_m=-1, H_l_m=1).validate()
