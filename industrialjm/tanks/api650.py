@@ -78,9 +78,7 @@ def housner_masses(geom: TankGeometry, Sa_i: float, Sa_c: float
     D, H = geom.D_m, geom.H_l_m
     W_l = geom.W_l_kN
 
-    # Razones Housner (forma cerrada exacta del integral)
-    ratio_HD = H / D
-    tanh_term = tanh(sqrt(3.0) * D / (2.0 * H)) if H > 0 else 1.0
+    # Razones Housner (forma cerrada). H > 0 garantizado por geom.validate().
     Wi_over_W = tanh(sqrt(3.0) * D / (2.0 * H)) / (sqrt(3.0) * D / (2.0 * H))
     Wc_over_W = (D / H) * 0.230 * tanh(3.67 * H / D)
 
@@ -89,11 +87,9 @@ def housner_masses(geom: TankGeometry, Sa_i: float, Sa_c: float
 
     # Brazos (sin contribución por presión de fondo)
     h_i = 0.375 * H
-    h_c = H * (1.0 - (1.0 - 0.218 / (Wc_over_W or 1e-9)) / 1.0)
-    # Forma estable equivalente:
     h_c = H * (1.0 - (1.0 / (3.67 * H / D)) * (
-        (((H/D)**2) / (Wc_over_W + 1e-9))
-    )) if H > 0 else 0.0
+        ((H / D) ** 2) / (Wc_over_W + 1e-9)
+    ))
     h_c = max(0.4 * H, min(0.7 * H, h_c))  # acotar al rango físico
 
     # Periodo impulsivo (API 650 §E.4.5.1 / Malhotra 2000)

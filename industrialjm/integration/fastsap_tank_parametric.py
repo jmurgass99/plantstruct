@@ -49,4 +49,42 @@ class FastSAPTankBuilder:
         return {"joints": joints, "shells": shells, "applied": created, "dry_run": False}
 
 
-__all__ = ["TankParametric", "FastSAPTankBuilder"]
+def build_housner_stick_model(geom: Any, Sa_i: float, Sa_c: float,
+                              g: float = 9.80665) -> dict:
+    """Modelo "stick" Housner del líquido para SAP (idea #11): conecta
+    ``api650.housner_masses`` con un modelo de masas concentradas.
+
+    Representación production-correct del oleaje (API 650 §E): la masa impulsiva
+    (W_i/g) va rígida a la altura ``h_i``; la convectiva (W_c/g) cuelga de un
+    resorte horizontal de rigidez ``k_c = m_c·ω_c²`` (ω_c = 2π/T_c) a ``h_c`` —
+    así el modal reproduce el periodo de sloshing ``T_c``. Es uno de los casos
+    legítimos de masa concentrada (componente inercial discreto), no masa nodal
+    arbitraria.
+
+    Devuelve ``{nodes, masses, convective_spring, seismic}`` (en unidades kN-m:
+    masa en kN·s²/m, rigidez en kN/m)."""
+    from math import pi
+    from ..tanks.api650 import housner_masses
+
+    sm = housner_masses(geom, Sa_i, Sa_c)
+    m_i = sm.W_i_kN / g
+    m_c = sm.W_c_kN / g
+    omega_c = (2.0 * pi / sm.T_c_s) if sm.T_c_s > 0 else 0.0
+    k_c = m_c * omega_c ** 2
+
+    return {
+        "nodes": [
+            {"name": "BASE", "x": 0.0, "y": 0.0, "z": 0.0, "restraint": [True] * 6},
+            {"name": "IMP", "x": 0.0, "y": 0.0, "z": sm.h_i_m, "restraint": None},
+            {"name": "CONV", "x": 0.0, "y": 0.0, "z": sm.h_c_m, "restraint": None},
+        ],
+        "masses": [
+            {"node": "IMP", "mass": m_i, "note": "impulsiva (rígida al manto)"},
+            {"node": "CONV", "mass": m_c, "note": "convectiva (sobre resorte T_c)"},
+        ],
+        "convective_spring": {"node": "CONV", "k_kN_m": k_c, "T_c_s": sm.T_c_s},
+        "seismic": sm.to_dict(),
+    }
+
+
+__all__ = ["TankParametric", "FastSAPTankBuilder", "build_housner_stick_model"]
