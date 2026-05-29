@@ -40,13 +40,15 @@ class FastSAPTankBuilder:
         if self.dry_run or self.client is None:
             return {"joints": joints, "shells": shells, "dry_run": True}
         created = 0
+        failed: dict[str, str] = {}
         for s in shells:
             try:
                 self.client.AreaObj.AddByPoint([s["n1"], s["n2"], s["n3"], s["n4"]], s["name"])
                 created += 1
-            except Exception:  # pragma: no cover
-                pass
-        return {"joints": joints, "shells": shells, "applied": created, "dry_run": False}
+            except Exception as exc:  # registra el fallo, no lo traga en silencio
+                failed[s["name"]] = str(exc)
+        return {"joints": joints, "shells": shells,
+                "applied": created, "failed": failed, "dry_run": False}
 
 
 def build_housner_stick_model(geom: Any, Sa_i: float, Sa_c: float,
