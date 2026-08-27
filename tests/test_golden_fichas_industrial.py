@@ -30,6 +30,7 @@ Fichas ancla
   - Tensión de membrana esférica pura: sigma = P * R / (2 * t * E).
 """
 from __future__ import annotations
+from industrialjm.tanks import hoop_tension
 
 import math
 import pytest
@@ -64,28 +65,28 @@ class TestW01046CylindricalTankHoopMembraneGolden:
         H = 10.0       # m
         r = 5.0        # m (radio)
         gamma = 10000.0  # N/m3
-        y = 0.0        # base del depósito
 
-        T_base_N_m = gamma * (H - y) * r
+        # Llamada a la funcion implementada en industrialjm.tanks.hoop_tension
+        T_base_N_m = hoop_tension(radius_m=r, liquid_height_m=H, gamma_N_m3=gamma, elevation_m=0.0)
         T_base_kN_m = T_base_N_m / 1000.0
 
         assert T_base_N_m == pytest.approx(500000.0, rel=1e-9)
         assert T_base_kN_m == pytest.approx(500.0, rel=1e-9)
 
         # A media altura (y = 5m), la tensión debe ser exactamente la mitad (250 kN/m)
-        T_mid_kN_m = (gamma * (H - 5.0) * r) / 1000.0
-        assert T_mid_kN_m == pytest.approx(250.0, rel=1e-9)
+        T_mid_N_m = hoop_tension(radius_m=r, liquid_height_m=H, gamma_N_m3=gamma, elevation_m=5.0)
+        assert (T_mid_N_m / 1000.0) == pytest.approx(250.0, rel=1e-9)
 
         # En la superficie libre (y = H = 10m), la tensión es nula
-        T_top_kN_m = (gamma * (H - 10.0) * r) / 1000.0
-        assert T_top_kN_m == pytest.approx(0.0, abs=1e-9)
+        T_top_N_m = hoop_tension(radius_m=r, liquid_height_m=H, gamma_N_m3=gamma, elevation_m=10.0)
+        assert T_top_N_m == pytest.approx(0.0, abs=1e-9)
 
     def test_ring_tension_under_internal_pressure(self):
         """Fórmula de anillo W01046 / W01096: T = R * P."""
         R = 4.0      # m
         P = 150.0    # kPa (kN/m2)
-        T = R * P    # kN/m
-        assert T == pytest.approx(600.0, rel=1e-9)
+        T_N_m = hoop_tension(radius_m=R, liquid_height_m=0.0, internal_pressure_kPa=P)
+        assert (T_N_m / 1000.0) == pytest.approx(600.0, rel=1e-9)
 
 
 class TestAPI650ShellDesignOneFootMethodGolden:

@@ -75,4 +75,28 @@ def shell_thickness_one_foot(
     )
 
 
-__all__ = ["ShellCourseResult", "shell_thickness_one_foot"]
+__all__ = ["ShellCourseResult", "shell_thickness_one_foot", "hoop_tension"]
+
+
+def hoop_tension(
+    radius_m: float,
+    liquid_height_m: float,
+    gamma_N_m3: float = 10000.0,
+    elevation_m: float = 0.0,
+    internal_pressure_kPa: float = 0.0,
+) -> float:
+    """Calcula la tension circunferencial (fuerza de anillo) T por unidad de altura en N/m.
+
+    Fuente: Fichas W01046 / W01096 / W01112 (depositos cilindricos y laminas de revolucion):
+        T = gamma * (H - y) * R + P_int * R
+    """
+    if radius_m <= 0:
+        raise ValueError("radius_m debe ser > 0")
+    if liquid_height_m < 0 or elevation_m < 0:
+        raise ValueError("liquid_height_m y elevation_m deben ser >= 0")
+
+    effective_head = max(0.0, liquid_height_m - elevation_m)
+    p_hydrostatic = gamma_N_m3 * effective_head  # N/m2 (Pa)
+    p_internal = internal_pressure_kPa * 1000.0  # N/m2 (Pa)
+    total_pressure = p_hydrostatic + p_internal
+    return total_pressure * radius_m  # N/m

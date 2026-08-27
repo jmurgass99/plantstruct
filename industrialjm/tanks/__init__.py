@@ -16,6 +16,11 @@ from .shell_buckling import (
     ShellBucklingFullResult,
     check_shell_buckling_full,
 )
+from .shell_design import (
+    ShellCourseResult,
+    shell_thickness_one_foot,
+    hoop_tension,
+)
 
 __all__ = [
     "TankGeometry", "SeismicMasses",
@@ -24,4 +29,5 @@ __all__ = [
     "AnchorageJInput", "AnchorageJResult", "check_anchorage_J",
     "ShellBucklingInput", "ShellBucklingResult", "check_shell_buckling",
     "ShellBucklingFullInput", "ShellBucklingFullResult", "check_shell_buckling_full",
+    "ShellCourseResult", "shell_thickness_one_foot", "hoop_tension",
 ]

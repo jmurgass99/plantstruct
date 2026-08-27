@@ -1,2 +1,1 @@
-"""IndustrialJm — Estanques metálicos API650 + estructuras industriales."""
-__version__ = "0.1.0"
+from .tanks import shell_thickness_one_foot, hoop_tension  # noqa: F401
