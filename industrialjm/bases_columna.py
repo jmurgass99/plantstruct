@@ -1,11 +1,61 @@
 """Bases de columna - diseno placa base por Salmon & Johnson.
 
 Considera carga axial + momento, dimensiona placa, anclajes y rigidizadores.
+
+ANCLAJES A TRACCION -- ACI 318-19 Capitulo 17
+=============================================
+La capacidad a traccion de los anclajes NO es solo la fluencia del acero. ACI
+318-19 exige tomar el MINIMO de los modos aplicables:
+
+    §17.6.1  resistencia del ACERO
+    §17.6.2  arrancamiento del CONO DE HORMIGON (concrete breakout, metodo CCD)
+    §17.6.3  extraccion (pullout)
+    §17.6.4  desprendimiento lateral (side-face blowout)
+
+Estos modos necesitan geometria que NO estaba en la entrada del modulo: h_ef,
+ca1, ca2, separacion entre pernos y area de apoyo de la cabeza A_brg. Rellenarlos
+con valores "tipicos" seria fabricar seguridad sobre datos inventados, asi que
+se ha elegido la salida (b):
+
+    * son ENTRADAS OPCIONALES;
+    * si faltan, los modos del hormigon se reportan como NO CALCULADO (``None``)
+      y ``AnchorTensionResult.missing_inputs`` dice EXACTAMENTE cual falta;
+    * en ese caso ``is_ok`` es ``None`` (nunca ``True``), ``cumple`` es ``False``
+      y ``verification_status`` es ``NO_VERIFICADO``.
+
+Se distingue NO_APLICA de NO_CALCULADO: §17.6.4 solo rige si h_ef > 2.5*ca1; que
+no aplique no puede impedir un veredicto favorable.
+
+UNIDADES -- k_c
+---------------
+ACI 318-19 §17.6.2.2.1 da k_c en dos sistemas:
+
+    pulgada-libra (lb, psi, in):  k_c = 24 (coladero) / 17 (post-instalado)
+    SI            (N, mm, MPa):   k_c = 10 (coladero) /  7 (post-instalado)
+
+Comprobacion de la equivalencia (24 -> 10), convirtiendo la forma pulgada-libra:
+
+    f'c[psi] = 145.038*f'c[MPa]  -> sqrt() aporta 12.043
+    h_ef[in] = h_ef[mm]/25.4     -> ()^1.5 aporta 1/25.4^1.5 = 1/128.0
+    1 lb = 4.448 N
+    k_c,SI = 24 * 12.043 * 4.448 / 128.0 = 10.04  ->  10
+
+Este modulo trabaja en N/mm/MPa: usa k_c = 10. Usar 24 aqui multiplicaria la
+resistencia del cono por 2.4.
+
+ALCANCE DECLARADO (lo que NO se implementa)
+-------------------------------------------
+    * §17.7 (cortante en anclajes: acero, breakout y pryout) NO se implementa.
+      Este modulo lleva TODO el cortante a friccion + llave de cortante y nunca
+      asigna cortante a los pernos. Si el proyectista si se lo asigna, §17.7
+      queda pendiente y este modulo no lo cubre.
+    * §17.8 (interaccion traccion-cortante) queda fuera por lo anterior.
+    * La DEMANDA Tu bajo levantamiento neto (P <= 0) sigue sin derivarse.
 """
 from __future__ import annotations
 
 from dataclasses import dataclass
-from math import sqrt
+from math import pi, sqrt
 
 
 @dataclass(frozen=True)
@@ -30,6 +80,19 @@ class BaseColumnaInput:
     mu_friction: float = 0.40
     code: str = "US"
 
+    # --- Geometria del anclaje para ACI 318-19 Cap. 17 (OPCIONAL) -----------
+    # Si falta cualquiera de las requeridas por un modo, ese modo se reporta
+    # NO CALCULADO y el anclaje NO puede darse por verificado. NO hay valores
+    # "tipicos" por defecto: la ausencia se propaga como ausencia.
+    hef_mm: float | None = None        # profundidad efectiva de embebido
+    ca1_mm: float | None = None        # distancia al borde mas proximo
+    ca2_mm: float | None = None        # distancia al borde perpendicular
+    s_anchor_mm: float | None = None   # separacion entre pernos traccionados
+    Abrg_mm2: float | None = None      # area de apoyo de la cabeza (§17.6.3/§17.6.4)
+    cracked_concrete: bool = True      # §17.6.2.5 / §17.6.3.3
+    cast_in: bool = True               # coladero (k_c=10) vs post-instalado (k_c=7)
+    lambda_a: float = 1.0              # §17.2.4: 1.0 hormigon de peso normal
+
 
 # Dimensiones de la llave de cortante: NO se dimensionan, son constantes del
 # modulo. Se exponen como tales en el resultado (``ShearLugResult.dims_source``)
@@ -46,6 +109,355 @@ LUG_DIMS_SOURCE = (
 # Estados de verificacion del diseno de la base.
 STATUS_VERIFICADO = "VERIFICADO"
 STATUS_NO_VERIFICADO = "NO_VERIFICADO"
+
+# ---------------------------------------------------------------------------
+# ACI 318-19 Capitulo 17 -- coeficientes, EN UNIDADES SI (N, mm, MPa)
+# ---------------------------------------------------------------------------
+KC_CAST_IN_SI = 10.0          # §17.6.2.2.1, coladero      (24 en pulgada-libra)
+KC_POST_INSTALLED_SI = 7.0    # §17.6.2.2.1, post-instalado (17 en pulgada-libra)
+PSI_C_N_UNCRACKED_CAST_IN = 1.25   # §17.6.2.5, coladero en hormigon no fisurado
+PSI_C_P_UNCRACKED = 1.4            # §17.6.3.3, pullout en hormigon no fisurado
+NP_HEAD_COEFF = 8.0                # §17.6.3.2.2a: N_p = 8*A_brg*f'c
+NSB_COEFF_SI = 13.0                # §17.6.4.1: N_sb = 13*ca1*sqrt(A_brg)*lam*sqrt(f'c)
+                                   #            (160 en pulgada-libra)
+
+# Factores de reduccion. ENTRADA FIJA del modulo, NO verificada linea a linea
+# contra la Tabla 17.5.3 impresa de ACI 318-19: se toman los valores de la
+# condicion SIN armadura suplementaria (la desfavorable). El proyectista debe
+# confirmarlos. Los goldens del modulo aseveran capacidades NOMINALES, que no
+# dependen de estos factores.
+PHI_STEEL_TENSION = 0.75      # §17.5.3, acero ductil a traccion
+PHI_CONCRETE_TENSION = 0.70   # §17.5.3, modos de hormigon, Condicion B
+PHI_SOURCE = (
+    "ENTRADA FIJA: phi_acero = 0.75 y phi_hormigon = 0.70 (condicion sin "
+    "armadura suplementaria). NO verificados contra la Tabla 17.5.3 impresa de "
+    "ACI 318-19; las capacidades NOMINALES reportadas no dependen de ellos."
+)
+
+MODE_STEEL = "steel"
+MODE_BREAKOUT = "concrete_breakout"
+MODE_PULLOUT = "pullout"
+MODE_BLOWOUT = "side_face_blowout"
+MODE_NO_DEMAND = "sin_demanda_de_traccion"
+
+CALC_APLICA = "APLICA"
+CALC_NO_APLICA = "NO_APLICA"
+CALC_NO_CALCULADO = "NO_CALCULADO"
+
+
+def ANco_mm2(hef_mm: float) -> float:
+    """ACI 318-19 §17.6.2.1.4: area proyectada de UN anclaje sin bordes.
+
+        A_Nco = 9 * h_ef^2
+
+    Con h_ef = 300 mm:  9 * 300^2 = 810000 mm^2.
+    """
+    return 9.0 * hef_mm * hef_mm
+
+
+def Nb_kN(fc_MPa: float, hef_mm: float, cast_in: bool = True,
+          lambda_a: float = 1.0) -> float:
+    """ACI 318-19 §17.6.2.2.1: resistencia basica al arrancamiento del cono.
+
+        N_b = k_c * lambda_a * sqrt(f'c) * h_ef^1.5      [N, mm, MPa]
+
+    k_c = 10 (coladero) / 7 (post-instalado) en SI. Ver el docstring del modulo
+    para la conversion que demuestra que el 24 tabulado es pulgada-libra.
+
+    Derivacion con k_c=10, f'c=25 MPa, h_ef=300 mm, lambda_a=1.0:
+        sqrt(25) = 5 ;  300^1.5 = 300*17.3205080757 = 5196.1524227
+        N_b = 10 * 1.0 * 5 * 5196.1524227 = 259807.62114 N = 259.80762 kN
+    """
+    kc = KC_CAST_IN_SI if cast_in else KC_POST_INSTALLED_SI
+    return kc * lambda_a * sqrt(fc_MPa) * hef_mm ** 1.5 / 1000.0
+
+
+def psi_ed_N(ca_min_mm: float, hef_mm: float) -> float:
+    """ACI 318-19 §17.6.2.4: modificador por proximidad de borde.
+
+        c_a,min >= 1.5 h_ef  ->  1.0                                 (17.6.2.4.1a)
+        c_a,min <  1.5 h_ef  ->  0.7 + 0.3 * c_a,min / (1.5 h_ef)    (17.6.2.4.1b)
+    """
+    lim = 1.5 * hef_mm
+    if ca_min_mm >= lim:
+        return 1.0
+    return 0.7 + 0.3 * ca_min_mm / lim
+
+
+def ANc_mm2(hef_mm: float, ca1_mm: float, ca2_mm: float,
+            s_anchor_mm: float | None, n_tension: int) -> float:
+    """ACI 318-19 §17.6.2.1: area proyectada del grupo traccionado.
+
+    MODELO GEOMETRICO IMPLEMENTADO (hipotesis declarada, no una generalidad):
+    una unica FILA de ``n_tension`` anclajes, paralela al borde proximo, a
+    distancia ``ca1`` de el, con ``ca2`` a los bordes laterales y separacion
+    uniforme ``s``. Es la geometria que el modulo ya presuponia al usar n/2
+    pernos traccionados. Patrones arbitrarios NO estan cubiertos.
+
+        W1 (perpendicular al borde) = min(ca1, 1.5 h_ef) + 1.5 h_ef
+        W2 (a lo largo de la fila)  = min(ca2, 1.5 h_ef)
+                                      + (n_t - 1) * min(s, 3 h_ef)
+                                      + min(ca2, 1.5 h_ef)
+        A_Nc = min(W1 * W2, n_t * A_Nco)          (tope de §17.6.2.1.1)
+
+    El lado interior (opuesto al borde ca1) se toma como 1.5 h_ef completos:
+    HIPOTESIS de que ese borde esta a mas de 1.5 h_ef. Si no lo esta, el
+    resultado queda del lado INSEGURO y el modelo no aplica.
+    """
+    lim = 1.5 * hef_mm
+    w1 = min(ca1_mm, lim) + lim
+    gap = 0.0
+    if n_tension > 1:
+        if s_anchor_mm is None:
+            raise ValueError("s_anchor_mm requerido para n_tension > 1")
+        gap = (n_tension - 1) * min(s_anchor_mm, 3.0 * hef_mm)
+    w2 = min(ca2_mm, lim) + gap + min(ca2_mm, lim)
+    return min(w1 * w2, n_tension * ANco_mm2(hef_mm))
+
+
+@dataclass(frozen=True)
+class AnchorTensionResult:
+    """Anclajes a traccion: TODOS los modos de ACI 318-19 §17.6, no solo el acero.
+
+    ``None`` significa NO CALCULADO (falta un dato de entrada) salvo cuando el
+    ``*_status`` asociado dice ``NO_APLICA``. Las capacidades ``*_kN`` son
+    NOMINALES; las ``*_design_kN`` llevan el phi correspondiente.
+    """
+    Tu_kN: float | None
+    steel_capacity_kN: float | None
+    steel_capacity_design_kN: float | None
+    concrete_breakout_kN: float | None
+    concrete_breakout_design_kN: float | None
+    concrete_breakout_status: str
+    pullout_kN: float | None
+    pullout_design_kN: float | None
+    pullout_status: str
+    side_face_blowout_kN: float | None
+    side_face_blowout_design_kN: float | None
+    side_face_blowout_status: str
+    governing_mode: str | None
+    governing_capacity_kN: float | None
+    is_ok: bool | None
+    missing_inputs: tuple[str, ...]
+    notes: tuple[str, ...]
+    phi_source: str = PHI_SOURCE
+
+    def to_dict(self) -> dict:
+        return {
+            "Tu_kN": _round_or_none(self.Tu_kN, 2),
+            "steel_capacity_kN": _round_or_none(self.steel_capacity_kN, 2),
+            "steel_capacity_design_kN": _round_or_none(self.steel_capacity_design_kN, 2),
+            "concrete_breakout_kN": _round_or_none(self.concrete_breakout_kN, 2),
+            "concrete_breakout_design_kN": _round_or_none(
+                self.concrete_breakout_design_kN, 2),
+            "concrete_breakout_status": self.concrete_breakout_status,
+            "pullout_kN": _round_or_none(self.pullout_kN, 2),
+            "pullout_design_kN": _round_or_none(self.pullout_design_kN, 2),
+            "pullout_status": self.pullout_status,
+            "side_face_blowout_kN": _round_or_none(self.side_face_blowout_kN, 2),
+            "side_face_blowout_design_kN": _round_or_none(
+                self.side_face_blowout_design_kN, 2),
+            "side_face_blowout_status": self.side_face_blowout_status,
+            "governing_mode": self.governing_mode,
+            "governing_capacity_kN": _round_or_none(self.governing_capacity_kN, 2),
+            "is_ok": self.is_ok,
+            "missing_inputs": list(self.missing_inputs),
+            "notes": list(self.notes),
+            "phi_source": self.phi_source,
+        }
+
+
+def _comprobar_anclajes_traccion(inp: "BaseColumnaInput",
+                                 Tu_kN: float) -> AnchorTensionResult:
+    """Aplica ACI 318-19 §17.6 y devuelve el modo GOBERNANTE (el minimo).
+
+    Si falta cualquier dato requerido por un modo APLICABLE, ese modo sale
+    ``None``/``NO_CALCULADO`` y ``is_ok`` es ``None``: nunca ``True``.
+    """
+    notes: list[str] = []
+    missing: list[str] = []
+
+    n_t = max(int(inp.n_anchors) // 2, 1)
+
+    # ---- §17.6.1 ACERO ----------------------------------------------------
+    # El modulo usa fluencia sobre area BRUTA: N = n_t * (pi*db^2/4) * fyb.
+    # ACI 318-19 §17.6.1.2 usa N_sa = A_se,N * f_uta (ULTIMA sobre area
+    # resistente a traccion, con f_uta <= min(1.9 f_ya, 860 MPa)). Son formulas
+    # DISTINTAS y este modulo no recibe f_uta ni A_se,N: no se inventan. NO se
+    # ha verificado en que direccion difieren -- depende del grado y del area
+    # de rosca -- asi que no se afirma que la formula del modulo sea conservadora.
+    A_bolt = pi * inp.db_anchor_mm ** 2 / 4.0
+    steel_kN = n_t * A_bolt * inp.fyb_MPa / 1000.0
+    steel_design = PHI_STEEL_TENSION * steel_kN
+    notes.append(
+        "Acero (§17.6.1): capacidad calculada como fluencia sobre area bruta "
+        "(n/2 * pi*db^2/4 * fyb), NO como N_sa = A_se,N * f_uta de §17.6.1.2. "
+        "El modulo no recibe f_uta ni A_se,N y no se inventan; la direccion de "
+        "la diferencia NO esta verificada."
+    )
+
+    # ---- Datos geometricos disponibles -----------------------------------
+    hef, ca1, ca2 = inp.hef_mm, inp.ca1_mm, inp.ca2_mm
+    s, abrg = inp.s_anchor_mm, inp.Abrg_mm2
+    for nombre, valor in (("hef_mm", hef), ("ca1_mm", ca1), ("ca2_mm", ca2)):
+        if valor is None:
+            missing.append(nombre)
+    if n_t > 1 and s is None:
+        missing.append("s_anchor_mm")
+    if abrg is None:
+        missing.append("Abrg_mm2")
+
+    # ---- §17.6.2 ARRANCAMIENTO DEL CONO ----------------------------------
+    breakout_kN: float | None = None
+    breakout_status = CALC_NO_CALCULADO
+    if hef is not None and ca1 is not None and ca2 is not None and (
+            n_t == 1 or s is not None):
+        Nb = Nb_kN(inp.fc_MPa, hef, cast_in=inp.cast_in, lambda_a=inp.lambda_a)
+        A_Nc = ANc_mm2(hef, ca1, ca2, s, n_t)
+        A_Nco = ANco_mm2(hef)
+        # §17.6.2.3 Psi_ec,N: HIPOTESIS = 1.0. Grupo simetrico con la resultante
+        # de traccion centrada en la fila traccionada (e'_N = 0). Es la geometria
+        # declarada en ANc_mm2; con un reparto asimetrico NO seria 1.0.
+        psi_ec = 1.0
+        psi_ed = psi_ed_N(min(ca1, ca2), hef)
+        # §17.6.2.5
+        psi_c = 1.0 if inp.cracked_concrete else (
+            PSI_C_N_UNCRACKED_CAST_IN if inp.cast_in else 1.0)
+        # §17.6.2.6 Psi_cp,N: solo rige para POST-INSTALADOS en hormigon no
+        # fisurado sin armadura suplementaria, y necesita c_ac, que el modulo no
+        # recibe. Para coladeros es 1.0 POR REGLA (no por hipotesis).
+        psi_cp = 1.0
+        if not inp.cast_in and not inp.cracked_concrete:
+            notes.append(
+                "§17.6.2.6: Psi_cp,N se ha tomado 1.0 para un anclaje "
+                "POST-INSTALADO en hormigon no fisurado. Eso solo es correcto si "
+                "c_a,min >= c_ac; el modulo no recibe c_ac. Puede ser INSEGURO."
+            )
+        breakout_kN = (A_Nc / A_Nco) * psi_ec * psi_ed * psi_c * psi_cp * Nb
+        breakout_status = CALC_APLICA
+        notes.append(
+            f"§17.6.2 (CCD): A_Nc={A_Nc:.0f} mm2, A_Nco={A_Nco:.0f} mm2, "
+            f"Psi_ec,N={psi_ec:.3f} (HIPOTESIS: grupo simetrico, e'_N=0), "
+            f"Psi_ed,N={psi_ed:.4f}, Psi_c,N={psi_c:.2f}, Psi_cp,N={psi_cp:.2f}, "
+            f"N_b={Nb:.2f} kN con k_c="
+            f"{KC_CAST_IN_SI if inp.cast_in else KC_POST_INSTALLED_SI:.0f} (SI)."
+        )
+    else:
+        notes.append(
+            "§17.6.2 NO CALCULADO: falta geometria del anclaje "
+            f"({', '.join(n for n in missing if n != 'Abrg_mm2') or 'n/d'}). "
+            "El arrancamiento del cono de hormigon suele ser el modo GOBERNANTE."
+        )
+
+    # ---- §17.6.3 EXTRACCION (pullout) ------------------------------------
+    pullout_kN: float | None = None
+    pullout_status = CALC_NO_CALCULADO
+    if abrg is not None:
+        # §17.6.3.2.2a  N_p = 8 * A_brg * f'c   (perno/stud con cabeza)
+        # §17.6.3.1     N_pn = Psi_c,P * N_p ;  §17.6.3.3 Psi_c,P = 1.0 / 1.4
+        psi_cp_pull = 1.0 if inp.cracked_concrete else PSI_C_P_UNCRACKED
+        pullout_kN = n_t * psi_cp_pull * NP_HEAD_COEFF * abrg * inp.fc_MPa / 1000.0
+        pullout_status = CALC_APLICA
+    else:
+        notes.append(
+            "§17.6.3 (extraccion) NO CALCULADO: falta A_brg, el area de apoyo de "
+            "la cabeza del perno. Es un modo del HORMIGON, no del acero."
+        )
+
+    # ---- §17.6.4 DESPRENDIMIENTO LATERAL (side-face blowout) -------------
+    blowout_kN: float | None = None
+    blowout_status = CALC_NO_CALCULADO
+    if hef is not None and ca1 is not None:
+        if hef <= 2.5 * ca1:
+            # §17.6.4.1: el modo solo rige si h_ef > 2.5*ca1. NO APLICA != NO CALCULADO.
+            blowout_status = CALC_NO_APLICA
+        elif abrg is None:
+            notes.append(
+                "§17.6.4 APLICA (h_ef > 2.5*ca1) pero NO SE PUEDE CALCULAR: falta A_brg."
+            )
+        else:
+            # N_sb = 13 * ca1 * sqrt(A_brg) * lambda_a * sqrt(f'c)   [N, mm, MPa]
+            nsb = (NSB_COEFF_SI * ca1 * sqrt(abrg) * inp.lambda_a
+                   * sqrt(inp.fc_MPa) / 1000.0)
+            if ca2 is not None and ca2 < 3.0 * ca1:
+                # §17.6.4.1: si ca2 < 3*ca1 se multiplica por (1 + ca2/ca1)/4
+                nsb *= (1.0 + ca2 / ca1) / 4.0
+            blowout_kN = nsb
+            blowout_status = CALC_APLICA
+
+    designs: dict[str, float] = {}
+    incompletos: list[str] = []
+    designs[MODE_STEEL] = steel_design
+    breakout_design = None if breakout_kN is None else PHI_CONCRETE_TENSION * breakout_kN
+    pullout_design = None if pullout_kN is None else PHI_CONCRETE_TENSION * pullout_kN
+    blowout_design = None if blowout_kN is None else PHI_CONCRETE_TENSION * blowout_kN
+    for modo, val, status in ((MODE_BREAKOUT, breakout_design, breakout_status),
+                              (MODE_PULLOUT, pullout_design, pullout_status),
+                              (MODE_BLOWOUT, blowout_design, blowout_status)):
+        if status == CALC_NO_APLICA:
+            continue
+        if val is None:
+            incompletos.append(modo)
+        else:
+            designs[modo] = val
+
+    # ---- Veredicto --------------------------------------------------------
+    if Tu_kN <= 0.0:
+        # Sin demanda de traccion no hay modo de fallo a traccion que comprobar.
+        # NO es una via para aprobar sin comprobar el hormigon: se declara.
+        gov_mode: str | None = MODE_NO_DEMAND
+        gov_cap: float | None = None
+        is_ok: bool | None = True
+        notes.append(
+            "Tu = 0 kN: los anclajes no reciben traccion en esta combinacion, "
+            "luego §17.6 no tiene demanda contra la que comprobarse. El veredicto "
+            "NO significa que la capacidad del hormigon se haya calculado."
+        )
+    elif incompletos:
+        gov_mode = None
+        gov_cap = None
+        is_ok = None
+        notes.append(
+            "NO VERIFICADO: modos de HORMIGON sin calcular ("
+            + ", ".join(incompletos)
+            + "). Solo se ha comprobado el ACERO (§17.6.1); el modo gobernante "
+              "podria ser cualquiera de los del hormigon y ser mucho menor. "
+              "Suministre: " + ", ".join(missing) + "."
+        )
+    else:
+        gov_mode = min(designs, key=lambda k: designs[k])
+        gov_cap = designs[gov_mode]
+        is_ok = Tu_kN <= gov_cap
+        notes.append(
+            f"Modo gobernante a traccion: {gov_mode} con "
+            f"{gov_cap:.2f} kN de diseno frente a Tu = {Tu_kN:.2f} kN."
+        )
+
+    notes.append(
+        "ALCANCE: §17.7 (cortante en anclajes: acero, breakout y pryout) y §17.8 "
+        "(interaccion traccion-cortante) NO se comprueban. Este modulo lleva todo "
+        "el cortante a friccion + llave de cortante y no asigna cortante a los pernos."
+    )
+
+    return AnchorTensionResult(
+        Tu_kN=Tu_kN,
+        steel_capacity_kN=steel_kN,
+        steel_capacity_design_kN=steel_design,
+        concrete_breakout_kN=breakout_kN,
+        concrete_breakout_design_kN=breakout_design,
+        concrete_breakout_status=breakout_status,
+        pullout_kN=pullout_kN,
+        pullout_design_kN=pullout_design,
+        pullout_status=pullout_status,
+        side_face_blowout_kN=blowout_kN,
+        side_face_blowout_design_kN=blowout_design,
+        side_face_blowout_status=blowout_status,
+        governing_mode=gov_mode,
+        governing_capacity_kN=gov_cap,
+        is_ok=is_ok,
+        missing_inputs=tuple(missing),
+        notes=tuple(notes),
+    )
 
 
 @dataclass(frozen=True)
@@ -86,6 +498,7 @@ class BaseColumnaResult:
     Tu_anchor_kN: float | None
     e_mm: float | None
     shear_lug: ShearLugResult
+    anchor_tension: AnchorTensionResult
     reactions: dict
     cumple: bool
     code: str
@@ -108,9 +521,14 @@ class BaseColumnaResult:
                 "lug_thickness_mm": self.shear_lug.lug_thickness_mm,
                 "bearing_capacity_kN": _round_or_none(
                     self.shear_lug.bearing_capacity_kN, 2),
+                # shear_capacity_kN faltaba en esta serializacion: un campo
+                # calculado que el consumidor de la API no llegaba a ver.
+                "shear_capacity_kN": _round_or_none(
+                    self.shear_lug.shear_capacity_kN, 2),
                 "is_ok": self.shear_lug.is_ok,
                 "dims_source": self.shear_lug.dims_source,
             },
+            "anchor_tension": self.anchor_tension.to_dict(),
             "reactions": self.reactions,
             "cumple": self.cumple,
             "verification_status": self.verification_status,
@@ -161,11 +579,11 @@ def disenar_base(inp: BaseColumnaInput) -> BaseColumnaResult:
         l_crit = max(m, n, 1.0)
         t = l_crit * sqrt(2.0 * fp_max / (0.90 * inp.fy_MPa))
 
-    # Capacidad anclajes a tracción
-    import math
-    A_anchor = math.pi * (inp.db_anchor_mm ** 2) / 4.0
-    cap_anchor = (inp.n_anchors / 2.0) * A_anchor * inp.fyb_MPa / 1000.0
-    anchors_ok = Tu <= cap_anchor
+    # Capacidad de los anclajes a traccion: TODOS los modos de ACI 318-19 §17.6,
+    # no solo la fluencia del acero. ``is_ok`` es None (nunca True) si falta
+    # geometria para los modos del hormigon.
+    anchor_tension = _comprobar_anclajes_traccion(inp, Tu)
+    anchors_ok = anchor_tension.is_ok
 
     # Llave de cortante (Shear Lug) - AISC Design Guide 1 / Salmon & Johnson
     V_demand = abs(inp.V_kN)
@@ -210,12 +628,12 @@ def disenar_base(inp: BaseColumnaInput) -> BaseColumnaResult:
         )
 
     reactions = {"P_kN": inp.P_kN, "V_kN": inp.V_kN, "M_kNm": inp.M_kNm}
-    cumple = anchors_ok and (t > 0) and lug_ok
+    # anchors_ok es None cuando los modos del hormigon no se han podido calcular:
+    # ``is True`` impide que la ausencia se lea como un aprobado.
+    cumple = (anchors_ok is True) and (t > 0) and lug_ok
+    status = STATUS_VERIFICADO if anchors_ok is not None else STATUS_NO_VERIFICADO
 
-    notes = [
-        "Capacidad de anclajes a traccion = fluencia de los pernos unicamente; "
-        "NO incluye arrancamiento del cono de hormigon ni extraccion (ACI 318 Cap. 17).",
-    ]
+    notes = list(anchor_tension.notes)
     if lug_req:
         notes.append(LUG_DIMS_SOURCE)
 
@@ -226,10 +644,11 @@ def disenar_base(inp: BaseColumnaInput) -> BaseColumnaResult:
         Tu_anchor_kN=Tu,
         e_mm=e_mm,
         shear_lug=shear_lug_res,
+        anchor_tension=anchor_tension,
         reactions=reactions,
         cumple=cumple,
         code=inp.code,
-        verification_status=STATUS_VERIFICADO,
+        verification_status=status,
         notes=tuple(notes),
     )
 
@@ -244,8 +663,13 @@ def _resultado_levantamiento(inp: BaseColumnaInput) -> BaseColumnaResult:
         (e_mm = None);
       - la friccion base es mu * N_compresion = mu * 0 = 0 kN, luego cualquier
         cortante exige llave o pernos a cortante;
-      - la traccion de anclaje bajo levantamiento (axil + momento) NO esta
-        implementada en este modulo -> Tu_anchor_kN = None.
+      - la DEMANDA de traccion de anclaje bajo levantamiento (axil + momento)
+        NO esta derivada en este modulo -> Tu_anchor_kN = None.
+
+    Desde la implementacion de ACI 318-19 §17.6, la CAPACIDAD a traccion si esta
+    disponible (acero, cono, extraccion, desprendimiento lateral). Lo que falta
+    aqui es la DEMANDA, no la capacidad: sin Tu no hay nada contra lo que
+    comprobarla, luego el resultado sigue siendo NO VERIFICADO.
 
     Las dimensiones en planta si son independientes de P: proceden del contorno
     de la columna (d+100, bf+100), un MINIMO geometrico, no un dimensionamiento.
@@ -254,12 +678,37 @@ def _resultado_levantamiento(inp: BaseColumnaInput) -> BaseColumnaResult:
     notes = (
         f"NO VERIFICADO: P = {inp.P_kN:g} kN no es compresion. Traccion neta "
         f"(levantamiento) de {abs(min(inp.P_kN, 0.0)):g} kN que los anclajes deben "
-        "resistir junto con el efecto del momento; este modulo no dimensiona "
-        "anclajes a levantamiento ni la placa bajo traccion.",
+        "resistir junto con el efecto del momento; este modulo no deriva la "
+        "DEMANDA de traccion Tu bajo levantamiento ni dimensiona la placa bajo "
+        "traccion.",
+        "Matiz respecto a la version anterior de esta nota: la CAPACIDAD a "
+        "traccion de los anclajes SI esta implementada (ACI 318-19 §17.6: acero, "
+        "cono de hormigon, extraccion y desprendimiento lateral) y es accesible "
+        "por la rama de compresion. Lo que falta en levantamiento es la DEMANDA, "
+        "no la capacidad; sin Tu no hay comprobacion posible.",
         "Friccion base = mu * compresion = 0 kN: sin axil de compresion no hay "
         "transferencia de cortante por rozamiento.",
         "N_mm y B_mm son el MINIMO geometrico por contorno de columna "
         "(d+100, bf+100), no un dimensionamiento por aplastamiento.",
+    )
+    anchor_tension = AnchorTensionResult(
+        Tu_kN=None,
+        steel_capacity_kN=None,
+        steel_capacity_design_kN=None,
+        concrete_breakout_kN=None,
+        concrete_breakout_design_kN=None,
+        concrete_breakout_status=CALC_NO_CALCULADO,
+        pullout_kN=None,
+        pullout_design_kN=None,
+        pullout_status=CALC_NO_CALCULADO,
+        side_face_blowout_kN=None,
+        side_face_blowout_design_kN=None,
+        side_face_blowout_status=CALC_NO_CALCULADO,
+        governing_mode=None,
+        governing_capacity_kN=None,
+        is_ok=None,
+        missing_inputs=("Tu_kN (demanda de traccion bajo levantamiento)",),
+        notes=("Sin demanda Tu derivada no se comprueba ningun modo de §17.6.",),
     )
     shear_lug_res = ShearLugResult(
         required=V_demand > 0.0,
@@ -279,6 +728,7 @@ def _resultado_levantamiento(inp: BaseColumnaInput) -> BaseColumnaResult:
         Tu_anchor_kN=None,
         e_mm=None,
         shear_lug=shear_lug_res,
+        anchor_tension=anchor_tension,
         reactions={"P_kN": inp.P_kN, "V_kN": inp.V_kN, "M_kNm": inp.M_kNm},
         cumple=False,
         code=inp.code,
@@ -291,7 +741,24 @@ __all__ = [
     "BaseColumnaInput",
     "BaseColumnaResult",
     "ShearLugResult",
+    "AnchorTensionResult",
     "disenar_base",
+    "ANco_mm2",
+    "ANc_mm2",
+    "Nb_kN",
+    "psi_ed_N",
+    "KC_CAST_IN_SI",
+    "KC_POST_INSTALLED_SI",
+    "PHI_STEEL_TENSION",
+    "PHI_CONCRETE_TENSION",
+    "PHI_SOURCE",
+    "MODE_STEEL",
+    "MODE_BREAKOUT",
+    "MODE_PULLOUT",
+    "MODE_BLOWOUT",
+    "CALC_APLICA",
+    "CALC_NO_APLICA",
+    "CALC_NO_CALCULADO",
     "LUG_HEIGHT_MM",
     "LUG_THICKNESS_MM",
     "LUG_DIMS_SOURCE",
