@@ -135,6 +135,12 @@ class ShellBucklingFullResult:
     DCR_hoop: float
     DCR_bending: float
 
+    #: DCR axial si gobernase el knockdown de Rotter en vez del factor de
+    #: imperfección de entrada. NO interviene en `is_safe`; se publica porque el
+    #: resultado ya traía las dos capacidades y ninguna pista de cuál mandaba.
+    #: La brecha es 0.6·(1 + 0.005·R/t): 2.4x a R/t=600, 8.1x a R/t=2500.
+    DCR_axial_diamond: float
+
     # Interacción cuadrática: (fa/Fa)² + (fb/Fb)² ≤ 1.0
     DCR_interaction: float
 
@@ -144,6 +150,11 @@ class ShellBucklingFullResult:
 
     is_safe: bool
     governing_mode: str           # "axial" | "hoop" | "bending" | "interaction"
+
+    #: Qué capacidad axial sostiene el veredicto. Publicar dos capacidades y un
+    #: solo `is_safe` sin decir cuál gobierna es lo que hacía invisible un
+    #: factor de hasta 8.
+    axial_basis: str = "API650_alpha_imperfection"
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -156,12 +167,33 @@ class ShellBucklingFullResult:
             "DCR_axial": self.DCR_axial,
             "DCR_hoop": self.DCR_hoop,
             "DCR_bending": self.DCR_bending,
+            "DCR_axial_diamond": self.DCR_axial_diamond,
             "DCR_interaction": self.DCR_interaction,
             "alpha_diamond": self.alpha_diamond,
             "Fbi_diamond_MPa": self.Fbi_diamond_MPa,
             "is_safe": self.is_safe,
             "governing_mode": self.governing_mode,
+            "axial_basis": self.axial_basis,
         }
+
+
+def _validar_geometria(D_m: float, t_shell_mm: float, quien: str) -> None:
+    """Rechaza geometrías imposibles antes de que la aritmética las disfrace.
+
+    Con espesor negativo, ``(t/R)**1.5`` devuelve un COMPLEJO y la comparación
+    ``Fc_hoop > 0`` estalla en ``TypeError: '>' not supported between instances
+    of 'complex' and 'int'``: un error real, pero que no dice nada del problema
+    y aparece cincuenta líneas más abajo del sitio donde se puede arreglar.
+    Un espesor o un diámetro no positivos son datos malos (una extracción mal
+    parseada, unas unidades equivocadas), y merecen decirlo así.
+    """
+    if not D_m > 0:
+        raise ValueError(f"{quien}: D_m={D_m:g} m debe ser > 0")
+    if not t_shell_mm > 0:
+        raise ValueError(
+            f"{quien}: t_shell_mm={t_shell_mm:g} mm debe ser > 0. Un espesor no "
+            "positivo no es un manto delgado, es un dato mal leído."
+        )
 
 
 def _rotter_diamond_knockdown(R_mm: float, t_mm: float) -> float:
@@ -185,7 +217,22 @@ def check_shell_buckling_full(inp: ShellBucklingFullInput
         3. Pandeo por flexión: Fb = (t²·E)/(R·H) para esbeltos
         4. Interacción: (fa/Fa)² + (fb/Fb)² ≤ 1.0
         5. Pandeo diamante (Rotter): factor knockdown
+
+    QUÉ CAPACIDAD SOSTIENE EL VEREDICTO
+    -----------------------------------
+    `is_safe`, `DCR_axial` y `governing_mode` van por la ruta 1, con el
+    `alpha_imperfection` de entrada (0.6 por defecto).  El resultado publica
+    ADEMÁS `Fbi_diamond_MPa` (ruta 5) y ahora `DCR_axial_diamond`, porque las dos
+    capacidades convivían en la salida sin ninguna pista de cuál mandaba.  La
+    brecha entre ambas es la forma cerrada ``α·(1 + 0.005·R/t)``, que con
+    α = 0.6 da 2.4x a R/t = 600 y 8.1x a R/t = 2500 — crece con la esbeltez, no
+    es una constante.  Medido en un tanque de 30 m × 6 mm: DCR publicado 0.104,
+    DCR por Rotter 0.844.
+
+    Cuál debe gobernar es una decisión de norma y NO se toma aquí: se deja donde
+    estaba y se hace visible la otra.  `axial_basis` lo declara en la salida.
     """
+    _validar_geometria(inp.D_m, inp.t_shell_mm, "check_shell_buckling_full")
     R_mm = inp.D_m * 1000.0 / 2.0
     t = inp.t_shell_mm
     H_l_mm = inp.H_liquid_m * 1000.0
@@ -212,9 +259,14 @@ def check_shell_buckling_full(inp: ShellBucklingFullInput
     Fb_bending = E * t ** 2 / (R_mm * max(L_mm, 1.0))
 
     # --- DCR individuales ---
-    DCR_axial = sigma_axial / Fbi_axial if Fbi_axial > 0 else 0.0
-    DCR_hoop = sigma_hoop / Fc_hoop if Fc_hoop > 0 else 0.0
-    DCR_bending = sigma_bending / Fb_bending if Fb_bending > 0 else 0.0
+    # Capacidad <= 0 -> infinito, NO cero. Cero es el valor de "sobra margen": un
+    # manto sin capacidad salía por la API como seguro (medido: con E=0 los tres
+    # DCR daban 0.0 e is_safe True, con 134.9 MPa de demanda circunferencial).
+    # `check_shell_buckling`, veinte líneas más arriba en este mismo fichero, ya
+    # usaba float("inf") para la misma magnitud; esto solo restaura la coherencia.
+    DCR_axial = sigma_axial / Fbi_axial if Fbi_axial > 0 else float("inf")
+    DCR_hoop = sigma_hoop / Fc_hoop if Fc_hoop > 0 else float("inf")
+    DCR_bending = sigma_bending / Fb_bending if Fb_bending > 0 else float("inf")
 
     # --- Interacción cuadrática: (fa/Fa)² + (fb/Fb)² ≤ 1.0 ---
     DCR_interaction = DCR_axial ** 2 + DCR_bending ** 2
@@ -222,6 +274,10 @@ def check_shell_buckling_full(inp: ShellBucklingFullInput
     # --- Rotter diamond knockdown ---
     alpha_diamond = _rotter_diamond_knockdown(R_mm, t)
     Fbi_diamond = alpha_diamond * E * t / R_mm
+    # El resultado ya publicaba esta capacidad sin decir qué DCR implicaba, así
+    # que la brecha contra la ruta API 650 solo se veía recalculándola a mano.
+    DCR_axial_diamond = (sigma_axial / Fbi_diamond if Fbi_diamond > 0
+                         else float("inf"))
 
     # --- Governing mode ---
     dcr_max = max(DCR_axial, DCR_hoop, DCR_bending)
@@ -247,6 +303,7 @@ def check_shell_buckling_full(inp: ShellBucklingFullInput
         DCR_axial=DCR_axial,
         DCR_hoop=DCR_hoop,
         DCR_bending=DCR_bending,
+        DCR_axial_diamond=DCR_axial_diamond,
         DCR_interaction=DCR_interaction,
         alpha_diamond=alpha_diamond,
         Fbi_diamond_MPa=Fbi_diamond,

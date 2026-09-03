@@ -243,5 +243,10 @@ class TestShellBucklingFull:
             "Fb_bending_MPa", "DCR_axial", "DCR_hoop", "DCR_bending",
             "DCR_interaction", "alpha_diamond", "Fbi_diamond_MPa",
             "is_safe", "governing_mode",
+            # El resultado ya publicaba DOS capacidades axiales (Fbi_axial por
+            # API 650 y Fbi_diamond por Rotter) sin decir cual sostenia el
+            # veredicto ni que DCR implicaba la otra. La brecha entre ambas es
+            # 0.6*(1 + 0.005*R/t): 2.4x a R/t=600 y 8.1x a R/t=2500.
+            "DCR_axial_diamond", "axial_basis",
         }
         assert set(d.keys()) == expected_keys
