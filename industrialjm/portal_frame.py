@@ -26,7 +26,7 @@ K_Y_BASIS = (
 def calculate_wind_pressure(
     basic_wind_speed_m_s: float,  # Velocidad básica del viento v_b (m/s)
     height_z_m: float,            # Altura de la corona o alero (m)
-    terrain_category: int = 2,    # Categoría de terreno (0 a IV)
+    terrain_category: int | str = 2,  # Categoría de terreno (0 a IV)
     air_density: float = 1.25     # Densidad del aire (kg/m3)
 ) -> float:
     """Calcula la presión dinámica de pico q_p(z) según EN 1991-1-4.
@@ -37,18 +37,25 @@ def calculate_wind_pressure(
     # 1. Presión básica del viento (N/m2)
     q_b = 0.5 * air_density * (basic_wind_speed_m_s ** 2)
     
-    # 2. Factor de exposición c_e(z) aproximado para terreno estándar
-    # Categoría II: Terreno plano cultivado con obstáculos bajos
-    if terrain_category == 0:
+    # 2. Factor de exposición c_e(z) según EN 1991-1-4 Tabla 4.1
+    _CAT_MAP = {"0": 0, "I": 1, "1": 1, "II": 2, "2": 2, "III": 3, "3": 3, "IV": 4, "4": 4}
+    cat = _CAT_MAP.get(str(terrain_category).strip().upper())
+    if cat is None:
+        raise ValueError(
+            f"calculate_wind_pressure: terrain_category={terrain_category!r} no válida. "
+            "Valores permitidos según EN 1991-1-4 Tabla 4.1: 0, 1, 2, 3, 4 (o '0', 'I', 'II', 'III', 'IV')."
+        )
+
+    if cat == 0:
         ce = 3.0 * (height_z_m / 10.0) ** 0.17
-    elif terrain_category == 1:
+    elif cat == 1:
         ce = 2.5 * (height_z_m / 10.0) ** 0.19
-    elif terrain_category == 3:
-        ce = 1.8 * (height_z_m / 10.0) ** 0.25
-    elif terrain_category == 4:
-        ce = 1.2 * (height_z_m / 10.0) ** 0.30
-    else:  # Categoría II por defecto
+    elif cat == 2:
         ce = 2.1 * (height_z_m / 10.0) ** 0.22
+    elif cat == 3:
+        ce = 1.8 * (height_z_m / 10.0) ** 0.25
+    elif cat == 4:
+        ce = 1.2 * (height_z_m / 10.0) ** 0.30
         
     qp = ce * q_b
     return qp / 1000.0  # -> en kPa (kN/m2)
@@ -94,6 +101,11 @@ def _validar_flexocompresion(
             )
     for nombre, valor, clausula in (("chi_y", chi_y, "§6.3.1.2"),
                                     ("chi_LT", chi_LT, "§6.3.2.2")):
+        if valor is None:
+            raise ValueError(
+                f"{quien}: {nombre} debe proporcionarse explícitamente. "
+                "No se asumen factores de reducción por defecto (0.85/0.90)."
+            )
         if not 0.0 < valor <= 1.0:
             raise ValueError(
                 f"{quien}: {nombre}={valor:g} fuera de (0, 1]. El factor de "
@@ -120,8 +132,8 @@ def check_steel_member_interaction(
     A_mm2: float,           # Área bruta de la sección de acero
     Wel_y_mm3: float,       # Módulo elástico de la sección alrededor de eje y
     fyi_MPa: float,         # Límite elástico del acero (e.g. S275 = 275.0)
-    chi_y: float = 0.85,    # Factor de reducción por pandeo flexional (eje y)
-    chi_LT: float = 0.90,   # Factor de reducción por pandeo lateral-torsional
+    chi_y: float | None = None,   # Factor de reducción por pandeo flexional (eje y, obligatorio)
+    chi_LT: float | None = None,  # Factor de reducción por pandeo lateral-torsional (obligatorio)
     gamma_M0: float = 1.00, # Factor parcial para resistencia de secciones
     gamma_M1: float = 1.00  # Factor parcial para pandeo e inestabilidad de miembros
 ) -> dict[str, float | bool | str]:

@@ -128,7 +128,7 @@ def test_capacidad_axial_nula_nunca_declara_cumple():
 # ---------------------------------------------------------------------------
 def test_capacidad_a_flexion_nula_nunca_declara_cumple():
     """Misma patologia en el termino de flexion: ``chi_LT = 0``."""
-    estado, r = _veredicto(N_Ed_kN=1000.0, My_Ed_kNm=1e6, chi_LT=0.0,
+    estado, r = _veredicto(N_Ed_kN=1000.0, My_Ed_kNm=1e6, chi_y=0.85, chi_LT=0.0,
                            **HEB300_S275)
     if estado == RECHAZADO:
         _exigir_rechazo_explicito(str(r), "chi_LT")
@@ -161,7 +161,7 @@ def test_barra_sin_capacidad_nunca_declara_cumple(titulo, parametro, seccion):
     ``combined_interaction_ratio = 0.0`` y ``"CUMPLE"``: los dos ratios se
     fabricaban a cero a la vez y el sumatorio quedaba vacio.
     """
-    estado, r = _veredicto(N_Ed_kN=500.0, My_Ed_kNm=100.0, **seccion)
+    estado, r = _veredicto(N_Ed_kN=500.0, My_Ed_kNm=100.0, chi_y=0.85, chi_LT=0.90, **seccion)
     if estado == RECHAZADO:
         _exigir_rechazo_explicito(str(r), parametro)
         return
@@ -185,7 +185,7 @@ def test_el_veredicto_no_mejora_al_reducir_chi_y():
     Un salto de once ordenes de magnitud justo donde la funcion deberia
     diverger.
     """
-    fijos = dict(N_Ed_kN=500.0, My_Ed_kNm=100.0, **IPE400_S275)
+    fijos = dict(N_Ed_kN=500.0, My_Ed_kNm=100.0, chi_LT=0.90, **IPE400_S275)
     ya_fallaba = False
     for chi in (1e-2, 1e-4, 1e-6, 1e-9, 1e-12, 0.0):
         estado, r = _veredicto(chi_y=chi, **fijos)
@@ -217,13 +217,13 @@ def test_la_traccion_no_puede_compensar_una_flexion_sobrecargada():
     EN 1993-1-1 §6.3.3 se titula "Uniform members in bending and axial
     COMPRESSION"; la traccion es otro capitulo, no un caso favorable de este.
     """
-    _, sin_axil = _veredicto(N_Ed_kN=0.0, My_Ed_kNm=330.0, **IPE400_S275)
+    _, sin_axil = _veredicto(N_Ed_kN=0.0, My_Ed_kNm=330.0, chi_y=0.85, chi_LT=0.90, **IPE400_S275)
     assert sin_axil["ok"] is False, (
         "premisa del test rota: la barra deberia estar sobrecargada a flexion "
         f"pura, y da {sin_axil}"
     )
 
-    estado, r = _veredicto(N_Ed_kN=-1500.0, My_Ed_kNm=330.0, **IPE400_S275)
+    estado, r = _veredicto(N_Ed_kN=-1500.0, My_Ed_kNm=330.0, chi_y=0.85, chi_LT=0.90, **IPE400_S275)
     if estado == RECHAZADO:
         _exigir_rechazo_explicito(str(r), "N_Ed_kN")
         return
@@ -256,7 +256,7 @@ def test_caracterizacion_rama_valida_no_cambia():
         interac = n + k_y * (100 / 286.11)        =    0.65588746
     """
     r = check_steel_member_interaction(
-        N_Ed_kN=500.0, My_Ed_kNm=100.0, **IPE400_S275)
+        N_Ed_kN=500.0, My_Ed_kNm=100.0, chi_y=0.85, chi_LT=0.90, **IPE400_S275)
     assert r["member_compression_capacity_kN"] == pytest.approx(1974.2525)
     assert r["member_bending_capacity_kNm"] == pytest.approx(286.11)
     assert r["axial_utilization"] == pytest.approx(0.25326041, rel=1e-8)
@@ -272,7 +272,7 @@ def test_flexion_pura_sigue_siendo_calculable():
     termino axial vale cero de verdad, no fabricado.  La validacion no puede
     rechazarlo."""
     r = check_steel_member_interaction(
-        N_Ed_kN=0.0, My_Ed_kNm=100.0, **IPE400_S275)
+        N_Ed_kN=0.0, My_Ed_kNm=100.0, chi_y=0.85, chi_LT=0.90, **IPE400_S275)
     assert r["axial_utilization"] == 0.0
     assert r["interaction_coefficient_ky"] == pytest.approx(1.0)
     assert r["combined_interaction_ratio"] == pytest.approx(0.34951592, rel=1e-8)

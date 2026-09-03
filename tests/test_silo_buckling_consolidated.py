@@ -23,3 +23,22 @@ def test_buckling_resistance_returns_dict():
     res = buckling_resistance(E=210000.0, t=8.0, r=2500.0, quality_class="B")
     assert "sigma_cr" in res and "alpha" in res and "sigma_Rk" in res
     assert res["sigma_Rk"] == pytest.approx(res["alpha"] * res["sigma_cr"])
+
+
+def test_buckling_resistance_rejects_unspecified_quality():
+    """No debe fabricar silenciosamente calidad B inflada."""
+    with pytest.raises(ValueError, match="no default fabrication quality assumed"):
+        buckling_resistance(E=210000.0, t=8.0, r=2500.0)
+
+
+def test_buckling_resistance_vocabulary_compatibility():
+    """Unificación de vocabularios: 'B' y 'Q25' devuelven salida byte-idéntica."""
+    res_b = buckling_resistance(E=210000.0, t=8.0, r=3000.0, quality_class="B")
+    res_q25 = buckling_resistance(E=210000.0, t=8.0, r=3000.0, quality_class="Q25")
+    assert res_b == res_q25
+
+    # Medición del ratio B vs C: inflado de 1.513x
+    res_c = buckling_resistance(E=210000.0, t=8.0, r=3000.0, quality_class="C")
+    ratio_b_vs_c = res_b["sigma_Rk"] / res_c["sigma_Rk"]
+    assert ratio_b_vs_c == pytest.approx(1.513, rel=0.01)
+
