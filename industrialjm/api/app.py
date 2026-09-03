@@ -155,6 +155,46 @@ def create_router() -> Any:
             "memo_md": memo.markdown,
         }
 
+    class SiloJanssenPayload(BaseModel):
+        height_m: float = Field(..., gt=0)
+        diameter_m: float = Field(..., gt=0)
+        depth_z_m: float = Field(..., ge=0)
+        gamma_kN_m3: float = Field(..., gt=0)
+        mu_friction: float = Field(..., gt=0)
+        K_ratio: float = Field(..., gt=0)
+
+    @router.post("/api/industrial/silos/janssen", summary="Presiones de llenado en pared de silos según EN 1991-4 §5.2")
+    def silo_janssen_pressure(payload: SiloJanssenPayload) -> dict[str, Any]:
+        from ..ec1_silos import (
+            janssen_pressure, silo_slenderness_class, discharge_pressure_factors,
+        )
+        try:
+            slenderness = silo_slenderness_class(
+                h_c=payload.height_m, d_c=payload.diameter_m,
+            )
+            p_hf, p_vf = janssen_pressure(
+                z=payload.depth_z_m,
+                gamma=payload.gamma_kN_m3,
+                mu=payload.mu_friction,
+                K=payload.K_ratio,
+                d_h=payload.diameter_m,
+            )
+            C_h, C_w = discharge_pressure_factors(slenderness)
+            p_he = C_h * p_hf
+
+            return {
+                "slenderness": slenderness,
+                "aspect_ratio_hc_over_dc": payload.height_m / payload.diameter_m,
+                "p_hf_filling_horizontal_kPa": p_hf,
+                "p_vf_filling_vertical_kPa": p_vf,
+                "C_h_discharge_factor": C_h,
+                "C_w_discharge_factor": C_w,
+                "p_he_discharge_horizontal_kPa": p_he,
+                "code": "EN 1991-4:2006 §1.5.31-33 / §5.2 / §5.3",
+            }
+        except ValueError as exc:
+            raise HTTPException(400, str(exc)) from exc
+
     return router
 
 

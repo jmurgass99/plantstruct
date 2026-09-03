@@ -21,6 +21,9 @@ class ChimneyInput:
     E_MPa: float = 200_000.0
 
 
+VALIDATION_LEVEL = "experimental"
+
+
 @dataclass(frozen=True)
 class ChimneyResult:
     f1_Hz: float
@@ -29,9 +32,11 @@ class ChimneyResult:
     in_vortex_band: bool
     aspect_ratio: float
     self_weight_kN_per_m: float
+    validation_level: str = "experimental"
 
 
 def evaluate_chimney(inp: ChimneyInput) -> ChimneyResult:
+    """[ESTADO: EXPERIMENTAL] Chimeneas metálicas y desprendimiento de vórtices (EN 1991-1-4 §7.13 / DIN EN 13084)."""
     D = inp.D_outer_m
     t = inp.t_shell_mm / 1000.0
     H = inp.H_m
