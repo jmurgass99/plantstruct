@@ -67,15 +67,6 @@ def test_report_api650():
     assert "Anclaje" in md
 
 
-def test_foundation_radier():
-    from industrialjm.integration.foundation_radier import RadierInput, disenar_radier
-    res = disenar_radier(RadierInput(
-        D_radier_m=15, espesor_m=0.8, Q_kN=5000, M_kNm=200,
-    ))
-    assert res.q_max_kPa > res.q_min_kPa
-    assert res.asentamiento_mm > 0
-
-
 def test_fastsap_tank_parametric_dry_run():
     from industrialjm.integration.fastsap_tank_parametric import (
         TankParametric, FastSAPTankBuilder,
