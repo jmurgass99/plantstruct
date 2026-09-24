@@ -106,10 +106,26 @@ def render_tank_memo(inp: TankMemoInput) -> TankMemoResult:
             "is_ok": inp.t_shell_mm >= sc.t_required_mm,
         }
         t_check_ok = inp.t_shell_mm >= sc.t_required_mm
-    except ValueError:
-        shell_thick_dict = {"t_required_mm": 0, "is_ok": True, "governing": "N/A"}
+    except ValueError as exc:
+        # Una excepcion TRAGADA no puede producir un veredicto FAVORABLE.
+        #
+        # Antes: `{"t_required_mm": 0, "is_ok": True}` y `t_check_ok = True`. El
+        # `0` no es «no hace falta espesor», es «no se calculo» -- y ademas es el
+        # valor MAS HOLGADO posible, porque `t_actual >= 0` es cierto siempre.
+        #
+        # El disparador REAL no es una geometria imposible (`TankGeometry
+        # .validate()` ya la rechaza antes, medido): es `D > 60 m`, donde el
+        # Metodo del Pie NO APLICA por norma y hay que usar Variable-Design-
+        # Point. Una limitacion de metodo legitima se convertia en un aprobado,
+        # y justo en los tanques grandes.
+        #
+        # `t_check_ok = None` significa NO EVALUADO, distinto de `False` (que
+        # afirma que el espesor no cumple).
+        shell_thick_dict = {"t_required_mm": None, "is_ok": None,
+                            "governing": "NO CALCULADO",
+                            "not_evaluated_reason": str(exc)}
         sc = None
-        t_check_ok = True
+        t_check_ok = None
 
     # --- Geometría resumen ---
     R_m = inp.D_m / 2.0
@@ -142,6 +158,16 @@ def render_tank_memo(inp: TankMemoInput) -> TankMemoResult:
     )
 
     # Paso 2: Espesor por hidrostática
+    if sc is None:
+        # Antes, cuando no se podia calcular, este paso NO SE IMPRIMIA: el que
+        # leia la memoria no tenia forma de saber que faltaba, y mas abajo veia
+        # «Espesor: OK». El hueco se declara donde deberia haber estado el
+        # calculo.
+        md_sections.append(
+            "\n## Paso 2 — Verificacion de espesor (API 650 §5.6)\n"
+            f"- **NO CALCULADO**: {shell_thick_dict.get('not_evaluated_reason', 'sin motivo declarado')}\n"
+            f"- t_actual = {inp.t_shell_mm:.1f} mm, sin requisito con el que compararlo\n"
+        )
     if sc is not None:
         md_sections.append(
             "\n## Paso 2 — Verificacion de espesor (API 650 §5.6)\n"
@@ -178,10 +204,16 @@ def render_tank_memo(inp: TankMemoInput) -> TankMemoResult:
     )
 
     # Resumen
-    is_safe = a.is_safe and b.is_safe and t_check_ok
+    # `t_check_ok is True`, no `t_check_ok`: con `None` (no evaluado) el
+    # veredicto global NO puede ser CUMPLE. Y «NO CALCULADO» no es «NO CUMPLE»:
+    # los dos son desfavorables, pero le dicen cosas distintas al que lee la
+    # memoria -- uno manda a redimensionar, el otro a usar otro metodo.
+    is_safe = a.is_safe and b.is_safe and (t_check_ok is True)
+    _espesor = ("NO CALCULADO" if t_check_ok is None
+                else ("OK" if t_check_ok else "NO CUMPLE"))
     md_sections.append(
         "\n## Resultado\n"
-        f"- Espesor: {'OK' if t_check_ok else 'NO CUMPLE'}\n"
+        f"- Espesor: {_espesor}\n"
         f"- Anclajes: {'OK' if a.is_safe else 'NO CUMPLE'}\n"
         f"- Pandeo: {'OK' if b.is_safe else 'NO CUMPLE'}\n"
         f"- **VERIFICACION GLOBAL: {'CUMPLE' if is_safe else 'NO CUMPLE'}**\n"
