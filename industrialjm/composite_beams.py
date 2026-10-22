@@ -48,6 +48,7 @@ class SteelBeamProfile:
     Fy_MPa: float
     Es_MPa: float = 200_000.0
     self_weight_kN_per_m: float = 0.0
+    units: dict[str, str] = field(default_factory=lambda: {"force": "kN", "length": "mm", "stress": "MPa"})
 
     def __post_init__(self):
         if self.d_mm <= 0 or self.bf_mm <= 0 or self.tf_mm <= 0 or self.tw_mm <= 0:
@@ -87,6 +88,7 @@ class IndustrialMezzanineDemand:
     total_deflection_limit_ratio: float = 240.0 # L / 240
     point_load_dead_kN: float = 0.0    # Concentrated equipment dead load [kN]
     point_load_live_kN: float = 0.0    # Concentrated equipment live load [kN]
+    units: dict[str, str] = field(default_factory=lambda: {"force": "kN", "pressure": "kPa", "length": "m", "stress": "MPa"})
 
     def __post_init__(self):
         if self.span_m <= 0 or self.spacing_m <= 0:
@@ -119,6 +121,7 @@ class IndustrialCompositeBeamResult:
     applied_moment_kNm: float
     shear_capacity_kN: float
     applied_shear_kN: float
+    units: dict[str, str] = field(default_factory=lambda: {"force": "kN", "moment": "kNm", "length": "mm"})
     diagnostics: list[str] = field(default_factory=list)
 
     def summary_markdown(self) -> str:
