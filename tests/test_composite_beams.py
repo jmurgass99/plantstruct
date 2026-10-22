@@ -119,6 +119,7 @@ class TestAISCCompositeMezzanineDesign:
         assert res.is_viable is True
         assert res.standard_used == "AISC 360-16 (LRFD)"
         assert res.governing_dcr <= 1.0
+        assert res.governing_dcr == pytest.approx(res.governing_dcr, rel=1e-4)
         assert res.num_studs_total > 0
         assert "CUMPLE" in res.summary_markdown()
 

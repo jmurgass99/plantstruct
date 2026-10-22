@@ -436,10 +436,25 @@ def design_industrial_composite_beam(
         delta_live_limit = L_span_mm / demand.live_deflection_limit_ratio
         delta_total_limit = L_span_mm / demand.total_deflection_limit_ratio
 
-        dcr_flex_comp = loads["M_u_comp_kNm"] / m_rd_kNm if m_rd_kNm > 0 else 999.0
-        dcr_shear_comp = loads["V_u_comp_kN"] / V_rd_kN if V_rd_kN > 0 else 999.0
-        dcr_flex_const = loads["M_u_const_kNm"] / m_a_pl_rd_kNm if m_a_pl_rd_kNm > 0 else 0.0
-        dcr_shear_const = loads["V_u_const_kN"] / V_rd_kN if V_rd_kN > 0 else 0.0
+        if m_rd_kNm > 0:
+            dcr_flex_comp = loads["M_u_comp_kNm"] / m_rd_kNm
+        else:
+            dcr_flex_comp = float("inf")
+
+        if V_rd_kN > 0:
+            dcr_shear_comp = loads["V_u_comp_kN"] / V_rd_kN
+        else:
+            dcr_shear_comp = float("inf")
+
+        if m_a_pl_rd_kNm > 0:
+            dcr_flex_const = loads["M_u_const_kNm"] / m_a_pl_rd_kNm
+        else:
+            dcr_flex_const = 0.0 if loads["M_u_const_kNm"] == 0 else float("inf")
+
+        if V_rd_kN > 0:
+            dcr_shear_const = loads["V_u_const_kN"] / V_rd_kN
+        else:
+            dcr_shear_const = 0.0 if loads["V_u_const_kN"] == 0 else float("inf")
         dcr_delta_live = delta_live / delta_live_limit
         dcr_delta_total = delta_total / delta_total_limit
 
