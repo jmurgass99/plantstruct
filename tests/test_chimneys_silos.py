@@ -1,8 +1,8 @@
 """Tests chimneys + silos."""
 import pytest
 
-from industrialjm.chimneys import ChimneyInput, evaluate_chimney
-from industrialjm.silos_en1991_4 import SiloInput, janssen_pressures
+from plantstruct.chimneys import ChimneyInput, evaluate_chimney
+from plantstruct.silos_en1991_4 import SiloInput, janssen_pressures
 
 
 class TestChimney:

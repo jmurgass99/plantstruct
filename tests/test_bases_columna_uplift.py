@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import pytest
 
-from industrialjm.bases_columna import BaseColumnaInput, disenar_base
+from plantstruct.bases_columna import BaseColumnaInput, disenar_base
 
 
 def _uplift_input(**kw) -> BaseColumnaInput:

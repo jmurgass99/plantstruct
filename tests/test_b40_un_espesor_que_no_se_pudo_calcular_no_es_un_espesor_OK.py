@@ -48,7 +48,7 @@ from __future__ import annotations
 
 import pytest
 
-from industrialjm.memos.tank_complete import TankMemoInput, render_tank_memo
+from plantstruct.memos.tank_complete import TankMemoInput, render_tank_memo
 
 SANO = dict(D_m=20.0, H_l_m=12.0, H_shell_m=13.0, t_shell_mm=12.0,
             Sa_i_g=0.30, Sa_c_g=0.15)

@@ -1,7 +1,7 @@
 """Tests anchor codes multi-código."""
 import pytest
 
-from industrialjm.anchor_codes import AnchorInput, design_anchor_concrete_cone
+from plantstruct.anchor_codes import AnchorInput, design_anchor_concrete_cone
 
 
 @pytest.fixture

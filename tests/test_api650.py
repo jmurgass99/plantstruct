@@ -1,7 +1,7 @@
 """Tests para API 650 §E (masas Housner + pandeo manto)."""
 import pytest
 
-from industrialjm.tanks import (
+from plantstruct.tanks import (
     TankGeometry,
     housner_masses,
     shell_axial_buckling_stress,

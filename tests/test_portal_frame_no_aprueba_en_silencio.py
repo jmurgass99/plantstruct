@@ -41,7 +41,7 @@ from __future__ import annotations
 
 import pytest
 
-from industrialjm.portal_frame import check_steel_member_interaction
+from plantstruct.portal_frame import check_steel_member_interaction
 
 # IPE 400 / HEB 300, S275 (A y Wel,y de EN 10365).  El catalogo NO se importa
 # aqui a proposito: estos tests no verifican el catalogo, verifican la funcion.

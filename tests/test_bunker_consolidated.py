@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
-"""Tests para el dimensionado de bunkers y tolvas consolidado en IndustrialJm."""
+"""Tests para el dimensionado de bunkers y tolvas consolidado en PlantStruct."""
 import math
-from industrialjm.bunker import design_bunker
-from industrialjm.bunker_schemas import BunkerIn
+from plantstruct.bunker import design_bunker
+from plantstruct.bunker_schemas import BunkerIn
 
 
-def test_bunker_design_in_industrialjm():
+def test_bunker_design_in_plantstruct():
     inp = BunkerIn(
         impulse=2000.0,
         m=200.0,

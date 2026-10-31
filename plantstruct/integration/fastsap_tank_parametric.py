@@ -1,4 +1,4 @@
-"""Bridge IndustrialJm -> FastSAP: generacion parametrica de modelo de tanque."""
+"""Bridge PlantStruct -> FastSAP: generacion parametrica de modelo de tanque."""
 from __future__ import annotations
 
 from dataclasses import dataclass

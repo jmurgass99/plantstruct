@@ -8,7 +8,7 @@ Requisitos:
 from __future__ import annotations
 
 import pytest
-from industrialjm.bases_columna import (
+from plantstruct.bases_columna import (
     BaseColumnaInput,
     disenar_base,
 )

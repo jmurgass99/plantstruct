@@ -30,28 +30,28 @@ Fichas ancla
   - Tensión de membrana esférica pura: sigma = P * R / (2 * t * E).
 """
 from __future__ import annotations
-from industrialjm.tanks import hoop_tension
+from plantstruct.tanks import hoop_tension
 
 import math
 import pytest
 
-from industrialjm.tanks.shell_design import (
+from plantstruct.tanks.shell_design import (
     shell_thickness_one_foot,
     ShellCourseResult,
 )
-from industrialjm.ec1_silos import (
+from plantstruct.ec1_silos import (
     janssen_pressure,
     silo_slenderness_class,
 )
-from industrialjm.silos_en1991_4 import (
+from plantstruct.silos_en1991_4 import (
     SiloInput,
     janssen_pressures,
 )
-from industrialjm.chimneys import (
+from plantstruct.chimneys import (
     ChimneyInput,
     evaluate_chimney,
 )
-from industrialjm.esferas_gpl import (
+from plantstruct.esferas_gpl import (
     EsferaGLPInput,
     disenar_esfera,
 )
@@ -66,7 +66,7 @@ class TestW01046CylindricalTankHoopMembraneGolden:
         r = 5.0        # m (radio)
         gamma = 10000.0  # N/m3
 
-        # Llamada a la funcion implementada en industrialjm.tanks.hoop_tension
+        # Llamada a la funcion implementada en plantstruct.tanks.hoop_tension
         T_base_N_m = hoop_tension(radius_m=r, liquid_height_m=H, gamma_N_m3=gamma, elevation_m=0.0)
         T_base_kN_m = T_base_N_m / 1000.0
 

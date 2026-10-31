@@ -40,7 +40,7 @@ import math
 
 import pytest
 
-from industrialjm.bases_columna import (
+from plantstruct.bases_columna import (
     BaseColumnaInput,
     Nb_kN,
     ANc_mm2,

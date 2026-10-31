@@ -1,12 +1,12 @@
 """
-Test suite for IndustrialJm Composite Beams (Mezzanines and Equipment Decks).
+Test suite for PlantStruct Composite Beams (Mezzanines and Equipment Decks).
 Covers AISC 360-16 and Eurocode 4 workflows, load calculations, shored vs unpropped
 construction checks, and failure diagnostics.
 """
 
 import pytest
 import math
-from industrialjm.composite_beams import (
+from plantstruct.composite_beams import (
     SteelBeamProfile,
     StudConnectorSpec,
     IndustrialMezzanineDemand,

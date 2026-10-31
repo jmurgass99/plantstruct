@@ -1,6 +1,6 @@
-"""Tests for consolidated silo buckling in IndustrialJm."""
+"""Tests for consolidated silo buckling in PlantStruct."""
 import pytest
-from industrialjm.silo_buckling import meridional_critical_stress, imperfection_alpha, buckling_resistance
+from plantstruct.silo_buckling import meridional_critical_stress, imperfection_alpha, buckling_resistance
 
 
 def test_meridional_critical_stress_analytical():

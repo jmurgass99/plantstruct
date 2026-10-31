@@ -1,4 +1,4 @@
-"""industrialjm.silo_buckling
+"""plantstruct.silo_buckling
 ===========================
 Cálculo de pandeo meridional de láminas cilíndricas en silos y depósitos (EN 1993-1-6).
 Consolidado desde SiloBucklingJm.

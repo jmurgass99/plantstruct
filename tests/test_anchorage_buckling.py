@@ -1,7 +1,7 @@
 """Tests para anchorage + shell_buckling."""
 import pytest
 
-from industrialjm.tanks import (
+from plantstruct.tanks import (
     AnchorageInput, ShellBucklingInput,
     check_anchorage, check_shell_buckling,
     TankGeometry, housner_masses,

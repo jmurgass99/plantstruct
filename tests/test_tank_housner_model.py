@@ -5,8 +5,8 @@ rígida + masa convectiva sobre resorte (k = m_c·ω_c²). Pura lógica, sin SAP
 """
 import math
 
-from industrialjm.tanks.api650 import TankGeometry, housner_masses
-from industrialjm.integration.fastsap_tank_parametric import build_housner_stick_model
+from plantstruct.tanks.api650 import TankGeometry, housner_masses
+from plantstruct.integration.fastsap_tank_parametric import build_housner_stick_model
 
 G = 9.80665
 

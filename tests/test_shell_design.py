@@ -2,7 +2,7 @@
 """Espesor de virola API 650 — Metodo del Pie (§5.6.3.2)."""
 import pytest
 
-from industrialjm.tanks.shell_design import shell_thickness_one_foot
+from plantstruct.tanks.shell_design import shell_thickness_one_foot
 
 
 class TestOneFoot:

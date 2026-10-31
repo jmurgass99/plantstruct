@@ -1,6 +1,6 @@
 """Tests external pressure."""
 import pytest
-from industrialjm.external_pressure import (
+from plantstruct.external_pressure import (
     ExtPressureInput, critical_external_pressure, max_unstiffened_length_m,
 )
 

@@ -1,7 +1,7 @@
 """FastSAPTankBuilder debe reportar fallos OAPI, no tragarlos en silencio."""
 from __future__ import annotations
 
-from industrialjm.integration.fastsap_tank_parametric import (
+from plantstruct.integration.fastsap_tank_parametric import (
     TankParametric, FastSAPTankBuilder,
 )
 

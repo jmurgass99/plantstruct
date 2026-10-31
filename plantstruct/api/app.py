@@ -1,4 +1,4 @@
-"""FastAPI app para IndustrialJm — estanques API 650."""
+"""FastAPI app para PlantStruct — estanques API 650."""
 from typing import Any
 
 
@@ -202,6 +202,6 @@ def create_app() -> Any:
     """App FastAPI standalone."""
     from fastapi import FastAPI
 
-    app = FastAPI(title="IndustrialJm API", version="0.1.0")
+    app = FastAPI(title="PlantStruct API", version="0.1.0")
     app.include_router(create_router())
     return app

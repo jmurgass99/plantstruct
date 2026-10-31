@@ -1,5 +1,5 @@
 """Tests memoria completa estanque."""
-from industrialjm.memos import TankMemoInput, render_tank_memo
+from plantstruct.memos import TankMemoInput, render_tank_memo
 
 
 def test_memoria_genera_outputs():

@@ -1,10 +1,10 @@
-"""Tests para F.10 y F.11 en IndustrialJm (portal_frame.py).
+"""Tests para F.10 y F.11 en PlantStruct (portal_frame.py).
 
 F.10: check_steel_member_interaction exige chi_y y chi_LT obligatorios (sin defaults 0.85/0.90).
 F.11: calculate_wind_pressure rechaza categorías de terreno no normativas.
 """
 import pytest
-from industrialjm.portal_frame import check_steel_member_interaction, calculate_wind_pressure
+from plantstruct.portal_frame import check_steel_member_interaction, calculate_wind_pressure
 
 
 def test_check_steel_member_interaction_rejects_missing_chi_factors():

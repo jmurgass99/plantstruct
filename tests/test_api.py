@@ -1,10 +1,10 @@
-"""Test API IndustrialJm."""
+"""Test API PlantStruct."""
 import pytest
 
 fastapi = pytest.importorskip("fastapi")
 from fastapi.testclient import TestClient
 
-from industrialjm.api import create_app
+from plantstruct.api import create_app
 
 
 @pytest.fixture

@@ -7,8 +7,8 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from industrialjm.api.app import create_router
-from industrialjm.ec1_silos import (
+from plantstruct.api.app import create_router
+from plantstruct.ec1_silos import (
     janssen_pressure, silo_slenderness_class, discharge_pressure_factors,
 )
 

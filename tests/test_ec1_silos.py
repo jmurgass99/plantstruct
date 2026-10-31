@@ -3,7 +3,7 @@ from math import exp, isclose
 
 import pytest
 
-from industrialjm.ec1_silos import (
+from plantstruct.ec1_silos import (
     discharge_pressure_factors,
     flow_pressure_funnel,
     janssen_pressure,

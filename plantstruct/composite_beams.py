@@ -1,5 +1,5 @@
 """
-IndustrialJm — Industrial Mezzanine and Equipment Platform Composite Beams
+PlantStruct — Industrial Mezzanine and Equipment Platform Composite Beams
 ========================================================================
 Design, demand generation, and code compliance verification for steel-concrete
 composite beams in industrial facilities (mezzanines, walkways, heavy equipment decks).
@@ -10,7 +10,7 @@ Supports:
 
 Separation of Concerns:
 - Mechanics & Code formulas: CompositeJm
-- Industrial Demands & Serviceability checks: IndustrialJm
+- Industrial Demands & Serviceability checks: PlantStruct
 """
 
 from __future__ import annotations
@@ -19,13 +19,13 @@ from dataclasses import dataclass, field
 import math
 from typing import Literal
 
-from compositejm.aisc_composite_beam import (
+from ._composite.aisc_composite_beam import (
     AISCBeamSection,
     AISCSlabSpec,
     AISCStudSpec,
     verify_aisc_composite_beam,
 )
-from compositejm.composite_beam import (
+from ._composite.composite_beam import (
     b_effective as ec4_b_effective,
     mpl_rd_block_method as ec4_mpl_rd_block_method,
     shear_connector_resistance as ec4_stud_resistance,

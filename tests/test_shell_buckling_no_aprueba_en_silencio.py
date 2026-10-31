@@ -38,7 +38,7 @@ import math
 
 import pytest
 
-from industrialjm.tanks.shell_buckling import (
+from plantstruct.tanks.shell_buckling import (
     ShellBucklingFullInput,
     ShellBucklingInput,
     check_shell_buckling,
