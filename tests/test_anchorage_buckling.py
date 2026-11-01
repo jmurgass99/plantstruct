@@ -51,14 +51,19 @@ class TestShellBuckling:
         ))
         assert r.sigma_axial_critical_MPa > r.sigma_axial_demand_MPa
 
-    def test_interaccion_cuadratica(self):
+    def test_hoop_es_traccion_frente_a_Sd_y_no_entra_en_la_interaccion(self):
+        # Hasta 2026-11-01 la traccion anular hidrostatica se comparaba con la
+        # tension critica de Donnell a presion EXTERIOR (2-4 MPa) y entraba al
+        # cuadrado en la interaccion: cualquier tanque lleno daba DCR_hoop > 40.
         r = check_shell_buckling(ShellBucklingInput(
             D_m=20, H_shell_m=16, H_liquid_m=15, t_shell_mm=6,
         ))
-        # DCR_interaction ≈ DCR_hoop² + DCR_axial²
-        assert r.DCR_interaction == pytest.approx(
-            r.DCR_axial ** 2 + r.DCR_hoop ** 2, rel=1e-6,
-        )
+        sigma_hoop = 9.81 * 15 * 20 / (2 * 0.006) / 1000.0   # 245.25 MPa
+        assert r.sigma_hoop_demand_MPa == pytest.approx(sigma_hoop)
+        assert r.sigma_hoop_allowable_MPa == 160.0
+        assert r.DCR_hoop == pytest.approx(sigma_hoop / 160.0)
+        assert r.DCR_interaction == pytest.approx(r.DCR_axial)
+        assert not r.is_safe                                   # 245 MPa > 160 MPa: no cumple a traccion
 
 
 def test_integracion_housner_anchorage():
@@ -99,10 +104,13 @@ class TestAnchorageJ:
 
     def test_J_conditioned(self):
         """J entre 0.785 y 1.54 -> conditioned."""
-        # Calibrar: J = M / (D^2 * W_t) -> 1.0 si M = D^2 * W_t
+        # Calibrar: J = M / (D^2 * w_t) con w_t = W_t/(pi*D) (API 650 E.6.2.1.1.1,
+        # fuerza por unidad de perimetro). Hasta 2026-10-31 el test calibraba con
+        # el peso TOTAL (M = D^2 * W_t), que es la formula erronea que tenia el codigo.
+        from math import pi
         D = 10
         W_t = 1000
-        M = 1.0 * D ** 2 * W_t  # J = 1.0
+        M = 1.0 * D ** 2 * W_t / (pi * D)  # J = 1.0
         r = check_anchorage_J(AnchorageJInput(
             D_m=D, M_rw_kNm=M, W_t_kN=W_t,
         ))
@@ -239,7 +247,7 @@ class TestShellBucklingFull:
         d = r.to_dict()
         expected_keys = {
             "sigma_axial_demand_MPa", "sigma_hoop_demand_MPa",
-            "sigma_bending_demand_MPa", "Fbi_axial_MPa", "Fc_hoop_MPa",
+            "sigma_bending_demand_MPa", "Fbi_axial_MPa", "Fh_hoop_allowable_MPa",
             "Fb_bending_MPa", "DCR_axial", "DCR_hoop", "DCR_bending",
             "DCR_interaction", "alpha_diamond", "Fbi_diamond_MPa",
             "is_safe", "governing_mode",

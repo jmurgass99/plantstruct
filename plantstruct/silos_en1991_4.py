@@ -29,11 +29,16 @@ class SiloResult:
 
 
 def janssen_pressures(inp: SiloInput) -> SiloResult:
-    """Presiones según EN 1991-4 §5.2 (filling).
+    """Presiones de llenado según EN 1991-4 §5.2.1 (Janssen).
 
-    p_h(z) = γ·D/(4·μ·K)·(1 - exp(-z·4·μ·K/D))
-    p_v(z) = p_h(z) / K
-    p_w(z) = μ · p_h(z)
+        z_o = D/(4·μ·K)                      profundidad característica
+        p_h(z) = γ·K·z_o·(1 − exp(−z/z_o))   = γ·D/(4·μ)·(1 − exp(−z/z_o))
+        p_v(z) = p_h(z)/K
+        p_w(z) = μ·p_h(z)
+
+    Hasta 2026-11-01 la presión horizontal se calculaba como γ·z_o·(1 − e^(−z/z_o)),
+    sin el factor K: era la presión VERTICAL (1/K ≈ 1,9–2,5 veces mayor), y p_v y
+    p_w arrastraban el error. `ec1_silos.janssen_pressure` siempre fue correcta.
     """
     from math import tan, radians
     D = inp.diameter_m
@@ -42,8 +47,8 @@ def janssen_pressures(inp: SiloInput) -> SiloResult:
     gamma = inp.bulk_density_kN_m3
     z = inp.height_filled_m
 
-    A = D / (4.0 * mu * K)
-    ph = gamma * A * (1.0 - exp(-z / A))
+    z_o = D / (4.0 * mu * K)
+    ph = gamma * K * z_o * (1.0 - exp(-z / z_o))
     pv = ph / K
     pw = mu * ph
 

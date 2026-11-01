@@ -17,7 +17,8 @@ from typing import Any
 from ..tanks import (
     AnchorageInput, ShellBucklingInput, TankGeometry,
     check_anchorage, check_shell_buckling, housner_masses,
-    AnchorageJInput, check_anchorage_J,
+    AnchorageJInput, check_anchorage_J, annulus_resisting_force_kN_m,
+    estimate_shell_and_roof_weight_kN,
     ShellBucklingFullInput, check_shell_buckling_full,
 )
 from ..tanks.shell_design import shell_thickness_one_foot
@@ -36,6 +37,9 @@ class TankMemoInput:
     bolt_diameter_mm: float = 25.4
     rho_l_kg_m3: float = 1000.0
     liquid_G: float = 1.0          # gravedad específica del líquido
+    t_annulus_mm: float | None = None   # anillo de fondo para w_a (§E.6.2.1.1.1); None = t_shell
+    Fy_annulus_MPa: float = 250.0
+    A_v: float = 0.0               # coeficiente de aceleración vertical (§E.6.1.3)
 
 
 @dataclass(frozen=True)
@@ -66,7 +70,18 @@ def render_tank_memo(inp: TankMemoInput) -> TankMemoResult:
                      t_shell_mm=inp.t_shell_mm,
                      rho_l_kg_m3=inp.rho_l_kg_m3)
     m = housner_masses(g, Sa_i=inp.Sa_i_g, Sa_c=inp.Sa_c_g)
-    W_tank = inp.W_tank_kN if inp.W_tank_kN is not None else g.W_l_kN * 1.05
+    # W_t = peso de manto + techo (§E.6.2.1.1.1). Hasta 2026-10-31 se tomaba
+    # 1,05·W_liquido: el líquido no resiste el levantamiento (solo el anillo w_a)
+    # y con él el uplift salía siempre nulo.
+    if inp.W_tank_kN is not None:
+        W_tank = inp.W_tank_kN
+        W_tank_source = "dato de entrada"
+    else:
+        W_tank = estimate_shell_and_roof_weight_kN(inp.D_m, inp.H_shell_m, inp.t_shell_mm)
+        W_tank_source = "estimado: manto de t_shell + techo plano de 5 mm, acero 78,5 kN/m3"
+    t_a = inp.t_annulus_mm if inp.t_annulus_mm is not None else inp.t_shell_mm
+    G_e = inp.liquid_G * (1.0 - 0.4 * inp.A_v)
+    w_a = annulus_resisting_force_kN_m(t_a, inp.Fy_annulus_MPa, inp.H_l_m, G_e, inp.D_m)
 
     # --- Anclaje básico ---
     a = check_anchorage(AnchorageInput(
@@ -83,7 +98,7 @@ def render_tank_memo(inp: TankMemoInput) -> TankMemoResult:
     # --- J-ratio (API 650 §E.6.2) ---
     aj = check_anchorage_J(AnchorageJInput(
         D_m=inp.D_m, M_rw_kNm=m.M_overturn_kNm, W_t_kN=W_tank,
-        bolt_diameter_mm=inp.bolt_diameter_mm,
+        bolt_diameter_mm=inp.bolt_diameter_mm, w_a_kN_m=w_a, A_v=inp.A_v,
     ))
 
     # --- Pandeo completo ---
@@ -144,6 +159,7 @@ def render_tank_memo(inp: TankMemoInput) -> TankMemoResult:
         f"- Espesor manto: t = {inp.t_shell_mm:.1f} mm\n"
         f"- Volumen: V = {V_m3:.0f} m3\n"
         f"- Peso liquido: W_l = {g.W_l_kN:.0f} kN\n"
+        f"- Peso manto + techo: W_t = {W_tank:.0f} kN ({W_tank_source})\n"
     )
 
     # Paso 1: Masas Housner
@@ -151,10 +167,11 @@ def render_tank_memo(inp: TankMemoInput) -> TankMemoResult:
         "\n## Paso 1 — Masas Housner (impulsiva/convectiva)\n"
         f"- Masa impulsiva: W_i = {m.W_i_kN:.0f} kN (h_i = {m.h_i_m:.2f} m)\n"
         f"- Masa convectiva: W_c = {m.W_c_kN:.0f} kN (h_c = {m.h_c_m:.2f} m)\n"
-        f"- **Periodo impulsivo: T_i = {m.T_i_s:.3f} s**\n"
+        f"- **Periodo impulsivo: T_i = {m.T_i_s:.3f} s** (API 650 E.4.5.1, C_i = {m.C_i:.2f})\n"
         f"- **Periodo convectivo: T_c = {m.T_c_s:.2f} s**\n"
-        f"- **Sismicidad:** Sa_i = {inp.Sa_i_g:.2f} g, Sa_c = {inp.Sa_c_g:.2f} g\n"
-        f"- **Momento volcante: M = {m.M_overturn_kNm:.0f} kN*m**\n"
+        f"- **Sismicidad:** A_i = {inp.Sa_i_g:.2f} g, A_c = {inp.Sa_c_g:.2f} g\n"
+        f"- **Cortante basal (SRSS): V = {m.V_base_kN:.0f} kN**\n"
+        f"- **Momento volcante (SRSS, base del manto): M_rw = {m.M_overturn_kNm:.0f} kN*m**\n"
     )
 
     # Paso 2: Espesor por hidrostática
@@ -184,6 +201,7 @@ def render_tank_memo(inp: TankMemoInput) -> TankMemoResult:
         f"- Uplift/perno = {a.F_uplift_per_bolt_kN:.0f} kN\n"
         f"- Capacidad/perno = {a.F_allowable_per_bolt_kN:.0f} kN\n"
         f"- DCR = {a.DCR:.2f}\n"
+        f"- w_t = {aj.w_t_kN_m:.1f} kN/m, w_a = {aj.w_a_kN_m:.1f} kN/m (anillo t_a = {t_a:.1f} mm)\n"
         f"- J-ratio = {aj.J:.3f} -> {aj.anchorage_type}\n"
         f"- Pernos requeridos (J): {aj.N_bolts_required}\n"
         f"- Silleta: t_base_plate = {aj.t_base_plate_mm:.1f} mm, "
@@ -192,11 +210,11 @@ def render_tank_memo(inp: TankMemoInput) -> TankMemoResult:
 
     # Paso 4: Pandeo del manto
     md_sections.append(
-        "\n## Paso 4 — Pandeo del manto\n"
+        "\n## Paso 4 — Pandeo del manto y traccion anular\n"
         f"- sigma_hoop = {b.sigma_hoop_demand_MPa:.1f} MPa "
-        f"(crit = {b.sigma_hoop_critical_MPa:.1f} MPa)\n"
+        f"(admisible S_d = {b.sigma_hoop_allowable_MPa:.1f} MPa; traccion, no pandeo)\n"
         f"- DCR_axial = {b.DCR_axial:.3f}\n"
-        f"- DCR_hoop = {b.DCR_hoop:.3f}\n"
+        f"- DCR_hoop (traccion anular) = {b.DCR_hoop:.3f}\n"
         f"- DCR_interaction = {b.DCR_interaction:.3f}\n"
         f"- Rotter alpha_diamond = {bf.alpha_diamond:.3f}\n"
         f"- Pandeo diamante: Fbi = {bf.Fbi_diamond_MPa:.1f} MPa\n"

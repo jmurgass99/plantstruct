@@ -7,9 +7,11 @@ Códigos:
     EU/SG: EN 1992-4 (anchor design)
     AU:   AS 5216 (post-installed) + SA TS 101
 
-Cubre el modo "pull-out de cono de concreto" simplificado:
-    N_cb = k·√f'c · h_ef^1.5   (US/CO)
-    N_Rk,c = k1·√fck · h_ef^1.5 (EU/SG)
+Cubre el modo "arrancamiento del cono de hormigón" de UN anclaje sin bordes
+(A_Nc = A_Nco) ni excentricidad, multiplicado por el número de anclajes:
+    N_cb  = Psi_c,N · k_c·√f'c · h_ef^1.5   (US/CO, SI: k_c = 10, Psi_c,N = 1,25 no fisurado)
+    N_Rk,c = k1·√fck · h_ef^1.5             (EU/SG: k1 = 7,7 / 11,0)
+Para grupos con bordes y separaciones use ``bases_columna`` (A_Nc/A_Nco, Psi_ed,N).
 """
 from __future__ import annotations
 
@@ -43,10 +45,14 @@ def design_anchor_concrete_cone(inp: AnchorInput, code: str = "US"
     fc = inp.fc_MPa
 
     if code in ("US", "CO"):
-        # ACI 318-19 Eq. 17.6.2.2
-        k_c = 10 if inp.cracked_concrete else 17  # SI
-        N_cb = k_c * sqrt(fc) * h ** 1.5 / 1000.0  # kN
-        phi = 0.65  # tension, cracked
+        # ACI 318-19 §17.6.2.2.1: k_c = 10 (SI, coladero). El hormigón no
+        # fisurado entra por Psi_c,N = 1,25 (§17.6.2.5), no por k_c. Hasta
+        # 2026-10-31 se usaba k_c = 17 para no fisurado, que es el valor en
+        # libras-pulgada de los anclajes POST-INSTALADOS (1,7x en vez de 1,25x).
+        k_c = 10.0
+        psi_c = 1.0 if inp.cracked_concrete else 1.25
+        N_cb = psi_c * k_c * sqrt(fc) * h ** 1.5 / 1000.0  # kN
+        phi = 0.65  # tension, Condición B sin armadura suplementaria (post-instalado)
         N_design = phi * N_cb * inp.n_anchors
         return AnchorResult(N_design_kN=N_design, phi_or_gamma=phi,
                              governing_mode="concrete_cone", code=code)

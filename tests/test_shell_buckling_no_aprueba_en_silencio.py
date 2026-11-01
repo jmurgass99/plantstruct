@@ -58,10 +58,12 @@ def test_capacidad_nula_no_puede_declararse_segura() -> None:
     `is_safe = True`, con 134.9 MPa de demanda circunferencial."""
     r = check_shell_buckling_full(ShellBucklingFullInput(**BASE, E_MPa=0.0))
 
-    assert r.Fbi_axial_MPa == 0.0 and r.Fc_hoop_MPa == 0.0
+    assert r.Fbi_axial_MPa == 0.0
     assert r.sigma_hoop_demand_MPa > 100.0, "el caso debe tener demanda real"
     assert math.isinf(r.DCR_axial)
-    assert math.isinf(r.DCR_hoop)
+    # La traccion anular se compara con S_d, no con una capacidad que dependa de
+    # E (desde 2026-11-01): con E = 0 sigue siendo finita y positiva.
+    assert math.isfinite(r.DCR_hoop) and r.DCR_hoop > 0.0
     assert math.isinf(r.DCR_bending)
     assert r.is_safe is False
 
@@ -78,7 +80,7 @@ def test_los_dos_chequeos_del_mismo_fichero_coinciden() -> None:
 
     assert simple.is_safe == completo.is_safe is False
     assert math.isinf(simple.DCR_axial) and math.isinf(completo.DCR_axial)
-    assert math.isinf(simple.DCR_hoop) and math.isinf(completo.DCR_hoop)
+    assert simple.DCR_hoop == pytest.approx(completo.DCR_hoop)
 
 
 def test_el_dcr_axial_individual_no_miente_aunque_la_interaccion_salve() -> None:

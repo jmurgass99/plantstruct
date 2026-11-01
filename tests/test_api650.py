@@ -70,9 +70,13 @@ def test_housner_invariantes_fisicos_en_rango(D_m, H_l_m):
     assert r.W_i_kN <= W_l + 1e-6
     assert r.W_i_kN + r.W_c_kN <= W_l * 1.1
 
-    # Brazos en rango físico (h_i exacto; h_c acotado por construcción)
-    assert r.h_i_m == pytest.approx(0.375 * H_l_m)
-    assert 0.4 * H_l_m <= r.h_c_m <= 0.7 * H_l_m
+    # Alturas de API 650 E.6.1.2.1: dos ramas para X_i; X_c crece con H/D hacia
+    # la superficie (0,86·H para H/D = 2). Hasta 2026-10-31 el test fijaba
+    # 0,375·H para todo D/H y acotaba X_c a 0,4–0,7·H, que era el recorte del código.
+    ratio = D_m / H_l_m
+    X_i_esperado = 0.375 * H_l_m if ratio >= 1.333 else (0.5 - 0.094 * ratio) * H_l_m
+    assert r.h_i_m == pytest.approx(X_i_esperado)
+    assert 0.5 * H_l_m <= r.h_c_m < H_l_m
 
     # Periodos no negativos y momento volcante no negativo
     assert r.T_i_s > 0.0

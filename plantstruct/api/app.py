@@ -10,7 +10,8 @@ def create_router() -> Any:
     from ..tanks import (
         AnchorageInput, ShellBucklingInput, TankGeometry,
         check_anchorage, check_shell_buckling, housner_masses,
-        AnchorageJInput, check_anchorage_J,
+        AnchorageJInput, check_anchorage_J, annulus_resisting_force_kN_m,
+        estimate_shell_and_roof_weight_kN,
         ShellBucklingFullInput, check_shell_buckling_full,
     )
     from ..memos import TankMemoInput, render_tank_memo
@@ -98,12 +99,14 @@ def create_router() -> Any:
 
         # Masas y periodos
         masses = housner_masses(g, Sa_i=payload.Sa, Sa_c=payload.Ss)
-        W_tank = g.W_l_kN * 1.05  # peso estabilizante estimado
+        # W_t = manto + techo estimados (no el líquido; hasta 2026-10-31 era 1,05·W_l)
+        W_tank = estimate_shell_and_roof_weight_kN(payload.D, payload.H * 1.05, payload.t_shell)
+        w_a = annulus_resisting_force_kN_m(payload.t_shell, 250.0, payload.H, 1.0, payload.D)
 
         # Anclaje J-ratio
         aj = check_anchorage_J(AnchorageJInput(
             D_m=payload.D, M_rw_kNm=masses.M_overturn_kNm, W_t_kN=W_tank,
-            bolt_diameter_mm=payload.bolt_diameter_mm,
+            bolt_diameter_mm=payload.bolt_diameter_mm, w_a_kN_m=w_a,
         ))
 
         # Pandeo completo
@@ -112,8 +115,8 @@ def create_router() -> Any:
             H_liquid_m=payload.H, t_shell_mm=payload.t_shell,
         ))
 
-        # Corte basal simplificado: V = Sa_i · W_i + Sa_c · W_c
-        base_shear = payload.Sa * masses.W_i_kN + payload.Ss * masses.W_c_kN
+        # Cortante basal SRSS (API 650 §E.6.1)
+        base_shear = masses.V_base_kN
 
         # Memoria markdown
         memo = render_tank_memo(TankMemoInput(
@@ -202,6 +205,8 @@ def create_app() -> Any:
     """App FastAPI standalone."""
     from fastapi import FastAPI
 
-    app = FastAPI(title="PlantStruct API", version="0.1.0")
+    from .. import __version__
+
+    app = FastAPI(title="PlantStruct API", version=__version__)
     app.include_router(create_router())
     return app
