@@ -1,0 +1,8 @@
+  h_c [m] h_c/d_c        clase   C_h   C_w p_hf fondo [kPa] p_he = C_h·p_hf p_we = C_w·μ·p_hf
+     18.0    3.00      slender  1.15  1.10            48.64           55.93             24.08
+      9.0    1.50 intermediate  1.15  1.10            37.51           43.14             18.57
+      4.0    0.67        squat  1.00  1.00            22.25           22.25             10.01
+      2.0    0.33    retaining  1.00  1.00            12.62           12.62              5.68
+
+La clase decide también la carga parcheada (§5.2.4) y si aplica el canal de flujo (Anexo G): ver el caso siguiente.
+Los C_h/C_w son los valores recomendados de la Tabla 5.2 para clase de evaluación 2; la clase 3 exige el cálculo detallado de §5.3.2.

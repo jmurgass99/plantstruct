@@ -4,13 +4,13 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "plantstruct"
-version = "0.1.0"
-description = "Industrial plant structures: API 650 tanks (Housner masses, shell buckling, anchorage), silos (EN 1991-4), chimneys, pipe racks, bunkers and composite mezzanine beams."
+version = "0.2.0"
+description = "Industrial plant structures: API 650 tanks (one-foot shell courses, hoop tension, shell buckling, external pressure, Annex E Housner masses with impulsive/convective periods, SRSS shear and moment, anchorage ratio J, bolts, full memo, stick model for SAP2000, ASCE 7-22 15.7), EN 1991-4 silos (Janssen, slenderness, discharge, patch load, EN 1993-1-6 buckling), chimneys, LPG spheres, pipe racks, portal frames, blast walls, column bases with ACI 318-19 ch. 17 anchors and composite mezzanine beams (AISC 360, EN 1994)."
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }
 authors = [{ name = "Jesús Murgas" }]
-keywords = ["industrial-structures", "API-650", "storage-tanks", "silos", "EN-1991-4", "pipe-rack", "chimney", "structural-engineering"]
+keywords = ["industrial-structures", "API-650", "storage-tanks", "housner", "seismic-tanks", "ASCE-7", "silos", "EN-1991-4", "janssen", "shell-buckling", "EN-1993-1-6", "pipe-rack", "chimney", "LPG-sphere", "ASME-VIII", "column-base-plate", "anchor-bolts", "ACI-318", "composite-beams", "AISC-360", "EN-1994", "structural-engineering", "plant-engineering"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Science/Research",

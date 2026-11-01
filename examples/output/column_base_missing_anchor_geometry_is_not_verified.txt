@@ -1,0 +1,10 @@
+T_u = 666.7 kN; acero nominal 380.0 kN, diseño 285.0 kN
+cono: NO_CALCULADO, extracción: NO_CALCULADO, desprendimiento lateral: NO_CALCULADO
+governing_mode = None, is_ok = None
+missing_inputs = ['hef_mm', 'ca1_mm', 'ca2_mm', 's_anchor_mm', 'Abrg_mm2']
+verification_status = NO_VERIFICADO, cumple = False
+
+Nota del módulo:
+   NO VERIFICADO: modos de HORMIGON sin calcular (concrete_breakout, pullout, side_face_blowout). Solo se ha comprobado el ACERO (§17.6.1); el modo gobernante podria ser cualquiera de los del hormigon y ser mucho menor. Suministre: hef_mm, ca1_mm, ca2_mm, s_anchor_mm, Abrg_mm2.
+
+Con la geometría completa (caso anterior) el mismo pilar sí obtiene veredicto: la diferencia es solo la información, no la carga.

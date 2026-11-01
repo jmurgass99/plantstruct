@@ -1,0 +1,21 @@
+Tanque A — agua, A36, CA 1,5 mm: D = 20 m, H = 15 m
+  virola  H sobre fondo [m]  t_d [mm]  t_t [mm] t_min [mm] t_req [mm]  manda
+       1              15.00     10.50      8.42        6.0      10.50  diseno
+       2              12.50      8.97      6.99        6.0       8.97  diseno
+       3              10.00      7.44      5.56        6.0       7.44  diseno
+       4               7.50      5.91      4.13        6.0       6.00  minimo_nominal
+       5               5.00      4.38      2.69        6.0       6.00  minimo_nominal
+       6               2.50      2.85      1.26        6.0       6.00  minimo_nominal
+
+Tanque B — crudo G 0,90, A573M-485, CA 3 mm: D = 36 m, H = 18 m
+  virola  H sobre fondo [m]  t_d [mm]  t_t [mm] t_min [mm] t_req [mm]  manda
+       1              18.00     17.56     15.01        8.0      17.56  diseno
+       2              15.75     15.71     13.10        8.0      15.71  diseno
+       3              13.50     13.86     11.19        8.0      13.86  diseno
+       4              11.25     12.01      9.29        8.0      12.01  diseno
+       5               9.00     10.16      7.38        8.0      10.16  diseno
+       6               6.75      8.31      5.47        8.0       8.31  diseno
+       7               4.50      6.45      3.56        8.0       8.00  minimo_nominal
+       8               2.25      4.60      1.65        8.0       8.00  minimo_nominal
+
+La prueba hidrostática (G = 1, sin CA) solo manda cuando el líquido es ligero y el CA pequeño; en las virolas altas manda el mínimo nominal por diámetro.

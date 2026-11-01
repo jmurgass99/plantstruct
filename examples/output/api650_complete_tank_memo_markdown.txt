@@ -1,0 +1,54 @@
+# Memoria de calculo — Estanque API 650 §E
+
+## Geometria
+- Diametro: D = 20.0 m
+- Altura liquido: H_l = 15.0 m
+- Altura manto: H_shell = 16.0 m
+- Espesor manto: t = 10.0 mm
+- Volumen: V = 4712 m3
+- Peso liquido: W_l = 46213 kN
+- Peso manto + techo: W_t = 912 kN (estimado: manto de t_shell + techo plano de 5 mm, acero 78,5 kN/m3)
+
+## Paso 1 — Masas Housner (impulsiva/convectiva)
+- Masa impulsiva: W_i = 32790 kN (h_i = 5.62 m)
+- Masa convectiva: W_c = 14057 kN (h_c = 10.20 m)
+- **Periodo impulsivo: T_i = 0.203 s** (API 650 E.4.5.1, C_i = 6.06)
+- **Periodo convectivo: T_c = 4.67 s**
+- **Sismicidad:** A_i = 0.15 g, A_c = 0.05 g
+- **Cortante basal (SRSS): V = 4969 kN**
+- **Momento volcante (SRSS, base del manto): M_rw = 28581 kN*m**
+
+## Paso 2 — Verificacion de espesor (API 650 §5.6)
+- t_design = 9.0 mm (condicion diseno)
+- t_test = 8.4 mm (prueba hidrostatica)
+- t_requerido = 9.0 mm (gobernante: diseno)
+- t_actual = 10.0 mm
+- Verificacion: OK
+
+## Paso 3 — Anclajes (API 650 §E.6.2)
+- Uplift/perno = 100 kN
+- Capacidad/perno = 153 kN
+- DCR = 0.66
+- w_t = 14.5 kN/m, w_a = 58.6 kN/m (anillo t_a = 10.0 mm)
+- J-ratio = 0.982 -> conditioned
+- Pernos requeridos (J): 26
+- Silleta: t_base_plate = 36.0 mm, L_anchor = 225 mm
+
+## Paso 4 — Pandeo del manto y traccion anular
+- sigma_hoop = 147.2 MPa (admisible S_d = 160.0 MPa; traccion, no pandeo)
+- DCR_axial = 0.000
+- DCR_hoop (traccion anular) = 0.920
+- DCR_interaction = 0.000
+- Rotter alpha_diamond = 0.167
+- Pandeo diamante: Fbi = 33.3 MPa
+- Modo gobernante: hoop
+
+## Resultado
+- Espesor: OK
+- Anclajes: OK
+- Pandeo: OK
+- **VERIFICACION GLOBAL: CUMPLE**
+
+Diccionario de anclaje J: {'J': 0.982, 'anchorage_type': 'conditioned', 'N_bolts_required': 26, 'Ab_mm2': 1017.876, 'Fp_kN': 4829.317, 't_base_plate_mm': 36.0, 'L_anchor_mm': 225.0, 'is_self_anchored': False, 'w_t_kN_m': 14.523, 'w_a_kN_m': 58.641}
+Espesor: {'t_design_mm': 9.0, 't_test_mm': 8.42, 't_required_mm': 9.0, 'governing': 'diseno', 'actual_mm': 10.0, 'is_ok': True}
+is_safe: True

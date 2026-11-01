@@ -1,0 +1,9 @@
+N = 300 mm, B = 300 mm (mínimo por contorno), t = None, e = None, T_u = None
+fricción = 0 kN → llave requerida: True, is_ok = None
+anclaje: is_ok = None, missing_inputs = ['Tu_kN (demanda de traccion bajo levantamiento)']
+verification_status = NO_VERIFICADO, cumple = False
+
+- NO VERIFICADO: P = -150 kN no es compresion. Traccion neta (levantamiento) de 150 kN que los anclajes deben resistir junto con el efecto del momento; este modul…
+- Matiz respecto a la version anterior de esta nota: la CAPACIDAD a traccion de los anclajes SI esta implementada (ACI 318-19 §17.6: acero, cono de hormigon, extr…
+- Friccion base = mu * compresion = 0 kN: sin axil de compresion no hay transferencia de cortante por rozamiento.
+- N_mm y B_mm son el MINIMO geometrico por contorno de columna (d+100, bf+100), no un dimensionamiento por aplastamiento.

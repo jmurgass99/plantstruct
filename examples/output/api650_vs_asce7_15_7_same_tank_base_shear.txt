@@ -1,0 +1,13 @@
+                              ASCE 7-22 §15.7  API 650 Anexo E
+W_i [kN]                               32,790           32,790
+W_c [kN]                               14,059           14,057
+T_i [s]                                 0.227            0.227
+T_c [s]                                 4.696            4.671
+aceleración impulsiva [g]              0.4167           0.3125   (S_ai·I_e/R_i frente a A_i = S_DS·I/R_wi)
+aceleración convectiva [g]             0.1597           0.1198   (S_ac·I_e/R_c frente a A_c)
+V_i [kN]                               13,977           10,483
+V_c [kN]                                2,245            1,684
+V = sqrt(V_i² + V_c²) [kN]             14,156           10,617
+
+Relación V_ASCE/V_API = 1.33: es R_wi/R_i = 4/3 en el término impulsivo, que domina.
+S_ac lleva el tope 1,5·S_DS; con T_c = 4,7 s está muy por debajo y manda 1,5·S_D1/T_c.

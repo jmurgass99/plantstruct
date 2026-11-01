@@ -1,0 +1,10 @@
+Depósito H = 10 m, r = 5 m, γ = 10 kN/m³
+  cota y [m]  T [kN/m]  T con p = 20 kPa [kN/m]  σ = T/t (t = 10 mm) [MPa]
+         0.0     500.0                    600.0                       60.0
+         2.5     375.0                    475.0                       47.5
+         5.0     250.0                    350.0                       35.0
+         7.5     125.0                    225.0                       22.5
+        10.0       0.0                    100.0                       10.0
+
+Ficha W01046: T_base = γ·H·r = 10000·10·5 = 500,000 N/m = 500 kN/m
+Fórmula de membrana: válida lejos del fondo y del techo, donde la restricción de borde añade flexión local.

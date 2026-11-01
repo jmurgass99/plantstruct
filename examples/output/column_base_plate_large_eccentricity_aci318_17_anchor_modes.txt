@@ -1,0 +1,12 @@
+Placa: N = 400 mm, B = 400 mm, t = 31.7 mm; e = 650 mm > N/6 = 67 mm → T_u = 666.7 kN en los 2 pernos traccionados
+  modo                   nominal [kN] diseño [kN] estado
+  acero §17.6.1                 380.0       285.0 APLICA
+  cono §17.6.2                  138.6        97.0 APLICA
+  extracción §17.6.3            480.0       336.0 APLICA
+  desprendimiento §17.6.4            —           — NO_APLICA
+Gobierna: concrete_breakout con 97.0 kN frente a T_u = 666.7 kN → is_ok = False
+Llave de cortante: requerida = False (fricción 160 kN frente a V = 80 kN)
+Estado: VERIFICADO, cumple = False
+
+N_b(f'c = 25 MPa, h_ef = 300 mm) = 259.81 kN (k_c = 10 SI; con el 24 de libras-pulgada saldría 2,4 veces más)
+Los φ (0,75 acero, 0,70 hormigón) son entrada fija del módulo sin armadura suplementaria; §17.7 (cortante en anclajes) no se comprueba: el cortante va a fricción y llave.

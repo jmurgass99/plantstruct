@@ -1,0 +1,8 @@
+M_rw = 29,601 kN·m, W_t = 900 kN → levantamiento total 4·M/D − W_t = 5,020 kN
+
+   N_b  perno F_y [MPa] P_AB [kN] cap. [kN]    DCR seguro  N_b mínimo
+    24    M30       250     209.2     106.0   1.97  False          48
+    48    M36       250     104.6     152.7   0.69   True          33
+    32    M36       400     156.9     244.3   0.64   True          21
+
+W_tank_kN es el peso de manto + techo + accesorios: con el peso del líquido en su lugar el levantamiento sale cero y el anclaje «cumple» sin calcular nada.

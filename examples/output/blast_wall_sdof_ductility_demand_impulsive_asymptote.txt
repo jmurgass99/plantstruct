@@ -1,0 +1,11 @@
+Muro: m = 600 kg/m², k = 2.0e+07 Pa/m, R_m = 150 kPa, L = 4 m, μ_adm = 3; T = 34.4 ms, x_el = 7.5 mm
+
+  i [Pa·s]      μ x_max [mm] θ apoyo [°] μ/μ_adm cumple
+       750   1.42       10.6        0.30    0.47 True
+      1000   1.74       13.1        0.37    0.58 True
+      1500   2.67       20.0        0.57    0.89 True
+      2000   3.96       29.7        0.85    1.32 False
+      2500   5.63       42.2        1.21    1.88 False
+
+Comprobación a mano para i = 1 500 Pa·s: μ = 1 + i²/(2·m·R_m·x_el) = 2.667 (paquete 2.667)
+La duración positiva de la onda debe ser << 34 ms para que valga la asíntota impulsiva; UFC 3-340-02 limita además θ a 2° (respuesta moderada) en hormigón armado.

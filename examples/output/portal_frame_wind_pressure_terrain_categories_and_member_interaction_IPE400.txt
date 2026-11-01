@@ -1,0 +1,20 @@
+q_b = ½·1,25·26² = 0.422 kPa; q_p(z = 8 m) por categoría de terreno:
+  categoría   0: q_p = 1.220 kPa
+  categoría   I: q_p = 1.012 kPa
+  categoría  II: q_p = 0.845 kPa
+  categoría III: q_p = 0.719 kPa
+  categoría  IV: q_p = 0.474 kPa
+
+IPE 400 S275, N_Ed = 250 kN, M_y,Ed = 180 kN·m, χ_y = 0,80, χ_LT = 0,85:
+  member_compression_capacity_kN   1858.120
+  member_bending_capacity_kNm      270.215
+  axial_utilization                0.135
+  bending_utilization              0.666
+  interaction_coefficient_ky       1.081
+  combined_interaction_ratio       0.854
+  status                           CUMPLE
+  k_y_basis: EN 1993-1-1 Anexo B, Tabla B.1 (Metodo 2, clases 1-2) SIMPLIFICADA: k_y = min(1 + 0.6*n, 1.4), equivalente a C_my = 1.0 …
+
+tracción: ValueError → check_steel_member_interaction: N_Ed_kN=-300 kN es TRACCIÓN, y EN 1993-1-1 §6.3.3 cubre 'members in bending an…
+
+χ_y ausente: ValueError → check_steel_member_interaction: chi_y debe proporcionarse explícitamente. No se asumen factores de reducción p…

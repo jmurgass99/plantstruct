@@ -1,0 +1,8 @@
+  D [m] P [bar] código t_min [mm] W_total [kN] P columna [kN] V_basal [kN]
+     20    17.5     US       63.5       26,402          2,640        5,280
+     20    17.5     EU       63.5       26,402          2,640        3,960
+     14    18.0     US       45.7        9,116          1,140        1,823
+     14    18.0     EU       45.7        9,116          1,140        1,367
+
+Comprobación UG-32 a mano para D = 20 m: t = 63.5 mm (paquete 63.5 mm)
+El peso total es líquido al 85 % más el casco de espesor t_min; el cortante basal es C_s·W, un coeficiente de criba, no un espectro.

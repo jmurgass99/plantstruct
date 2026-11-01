@@ -1,0 +1,16 @@
+### Verificación de Viga Compuesta Industrial (AISC 360-16 (LRFD))
+**Estado Global**: ✅ CUMPLE (DCR Gobernante = 0.47 por Flexión Compuesta)
+
+| Comprobación | DCR | Capacidad | Solicitación | Estado |
+| :--- | :---: | :---: | :---: | :---: |
+| Flexión Compuesta | 0.47 | 1110.4 kN·m | 523.6 kN·m | OK |
+| Cortante Compuesto | 0.27 | 851.4 kN | 232.7 kN | OK |
+| Flexión Constructiva | 0.30 | - | - | OK |
+| Flecha Sobrecarga (L/SLS) | 0.30 | - | 7.5 mm | OK |
+| Flecha Total (L/SLS) | 0.32 | - | 11.8 mm | OK |
+
+- **Conectores**: 70 pernos tipo stud (35 por semivano, paso ~129 mm)
+
+M_u = 523.6 kN·m frente a φM_n = 1110.4 kN·m; V_u = 232.7 kN frente a φV_n = 851.4 kN
+Flecha de sobrecarga 7.5 mm (L/360 = 25 mm); total 11.8 mm (L/240 = 37.5 mm)
+Viable: True; gobierna Flexión Compuesta con DCR 0.47

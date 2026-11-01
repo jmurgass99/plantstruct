@@ -1,0 +1,10 @@
+D = 20 m, H_manto = 16 m, H_líquido = 15 m, σ_axial = 15.0 MPa, σ_flexión = 10.0 MPa, S_d = 160 MPa
+
+  t [mm]    R/t Fbi API [MPa]  DCR_ax α_Rotter DCR_ax,Rotter  brecha σ_hoop [MPa] DCR_hoop DCR_flex        manda seguro
+       6   1667          72.0   0.208    0.107         1.167    5.60        245.2    1.533  222.222  interaction False
+       8   1250          96.0   0.156    0.138         0.680    4.35        183.9    1.150  125.000  interaction False
+      12    833         144.0   0.104    0.194         0.323    3.10        122.6    0.766   55.556  interaction False
+      20    500         240.0   0.062    0.286         0.131    2.10         73.6    0.460   20.000  interaction False
+
+`axial_basis` = API650_alpha_imperfection: el veredicto usa α = 0,6; la columna de Rotter es la otra lectura de la misma demanda.
+Con 6 y 8 mm manda la tracción anular (σ_hoop > S_d: hace falta el espesor del método del pie, 10,5 mm en la primera virola); con 12 y 20 mm el manto cumple y el axial queda holgado por la ruta API, no tanto por la de Rotter.
