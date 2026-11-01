@@ -92,6 +92,8 @@ class BaseColumnaInput:
     cracked_concrete: bool = True      # §17.6.2.5 / §17.6.3.3
     cast_in: bool = True               # coladero (k_c=10) vs post-instalado (k_c=7)
     lambda_a: float = 1.0              # §17.2.4: 1.0 hormigon de peso normal
+    futa_MPa: float | None = None
+    Ase_N_mm2: float | None = None
 
 
 # Dimensiones de la llave de cortante: NO se dimensionan, son constantes del
@@ -157,6 +159,8 @@ def ANco_mm2(hef_mm: float) -> float:
 
 def Nb_kN(fc_MPa: float, hef_mm: float, cast_in: bool = True,
           lambda_a: float = 1.0) -> float:
+    futa_MPa: float | None = None
+    Ase_N_mm2: float | None = None
     """ACI 318-19 §17.6.2.2.1: resistencia basica al arrancamiento del cono.
 
         N_b = k_c * lambda_a * sqrt(f'c) * h_ef^1.5      [N, mm, MPa]
@@ -287,7 +291,11 @@ def _comprobar_anclajes_traccion(inp: "BaseColumnaInput",
     # ha verificado en que direccion difieren -- depende del grado y del area
     # de rosca -- asi que no se afirma que la formula del modulo sea conservadora.
     A_bolt = pi * inp.db_anchor_mm ** 2 / 4.0
-    steel_kN = n_t * A_bolt * inp.fyb_MPa / 1000.0
+    if inp.futa_MPa is not None and inp.Ase_N_mm2 is not None:
+        futa_eff = min(inp.futa_MPa, 1.9 * inp.fyb_MPa, 860.0)
+        steel_kN = n_t * inp.Ase_N_mm2 * futa_eff / 1000.0
+    else:
+        steel_kN = n_t * A_bolt * inp.fyb_MPa / 1000.0
     steel_design = PHI_STEEL_TENSION * steel_kN
     notes.append(
         "Acero (§17.6.1): capacidad calculada como fluencia sobre area bruta "
@@ -737,7 +745,72 @@ def _resultado_levantamiento(inp: BaseColumnaInput) -> BaseColumnaResult:
     )
 
 
+
+
+def check_anchor_shear_aci318_17_7(
+    Vu_kN: float,
+    n_anchors: int,
+    db_anchor_mm: float,
+    futa_MPa: float,
+    fc_MPa: float,
+    hef_mm: float,
+    ca1_mm: float,
+    ca2_mm: float | None = None,
+    cracked_concrete: bool = True,
+    lambda_a: float = 1.0,
+    Ase_V_mm2: float | None = None,
+    Tu_kN: float = 0.0,
+    phi_Nn_kN: float | None = None,
+) -> dict:
+    phi_v_steel = 0.65
+    phi_v_conc = 0.70
+    ase_v = Ase_V_mm2 if Ase_V_mm2 is not None else 0.785 * (pi * db_anchor_mm ** 2 / 4.0)
+    futa_eff = min(futa_MPa, 860.0)
+    Vsa_kN = n_anchors * 0.60 * ase_v * futa_eff / 1000.0
+    Vsa_design_kN = phi_v_steel * Vsa_kN
+
+    le = min(hef_mm, 8.0 * db_anchor_mm)
+    Vb_kN = min(
+        0.6 * ((le / db_anchor_mm) ** 0.2) * sqrt(db_anchor_mm) * lambda_a * sqrt(fc_MPa) * (ca1_mm ** 1.5),
+        3.7 * lambda_a * sqrt(fc_MPa) * (ca1_mm ** 1.5),
+    ) / 1000.0
+    AVco = 4.5 * (ca1_mm ** 2)
+    w_v = 2.0 * min(ca2_mm, 1.5 * ca1_mm) if ca2_mm is not None else 3.0 * ca1_mm
+    h_v = 1.5 * ca1_mm
+    AVc = min(w_v * h_v, n_anchors * AVco)
+    psi_ed_v = 1.0 if (ca2_mm is None or ca2_mm >= 1.5 * ca1_mm) else (0.7 + 0.3 * ca2_mm / (1.5 * ca1_mm))
+    psi_c_v = 1.0 if cracked_concrete else 1.4
+    Vcb_kN = (AVc / AVco) * psi_ed_v * psi_c_v * Vb_kN
+    Vcb_design_kN = phi_v_conc * Vcb_kN
+
+    k_cp = 1.0 if hef_mm < 65.0 else 2.0
+    Ncp_kN = n_anchors * Nb_kN(fc_MPa, hef_mm, cast_in=True, lambda_a=lambda_a)
+    Vcp_kN = k_cp * Ncp_kN
+    Vcp_design_kN = phi_v_conc * Vcp_kN
+
+    phi_Vn_kN = min(Vsa_design_kN, Vcb_design_kN, Vcp_design_kN)
+    v_ratio = abs(Vu_kN) / max(phi_Vn_kN, 1e-9)
+    if Tu_kN > 0.0 and phi_Nn_kN is not None and phi_Nn_kN > 0.0:
+        n_ratio = Tu_kN / phi_Nn_kN
+        inter_17_8 = (n_ratio ** (5.0 / 3.0)) + (v_ratio ** (5.0 / 3.0))
+    else:
+        inter_17_8 = v_ratio
+
+    return {
+        "Vsa_kN": Vsa_kN,
+        "Vsa_design_kN": Vsa_design_kN,
+        "Vcb_kN": Vcb_kN,
+        "Vcb_design_kN": Vcb_design_kN,
+        "Vcp_kN": Vcp_kN,
+        "Vcp_design_kN": Vcp_design_kN,
+        "governing_shear_design_kN": phi_Vn_kN,
+        "shear_utilization": v_ratio,
+        "interaction_ratio_17_8": inter_17_8,
+        "is_ok": v_ratio <= 1.0 and inter_17_8 <= 1.0,
+    }
+
 __all__ = [
+    "check_anchor_shear_aci318_17_7",
     "BaseColumnaInput",
     "BaseColumnaResult",
     "ShearLugResult",
@@ -765,4 +838,3 @@ __all__ = [
     "STATUS_VERIFICADO",
     "STATUS_NO_VERIFICADO",
 ]
-

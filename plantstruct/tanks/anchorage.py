@@ -1,26 +1,5 @@
 """
 Anclajes de estanques API 650 §E.6.2 — relación de anclaje J, pernos y silleta.
-
-Procedimiento básico (``check_anchorage``):
-    1. M_rw de ``api650.housner_masses``
-    2. Carga por perno P_AB = (4·M_rw/D − W_t) / N_b   (§E.6.2.1.2 con w_t = W_t/(π·D):
-       P_AB = [1,273·M_rw/D² − w_t]·π·D/N_b, y 1,273·π = 4)
-    3. Comparar con 0,6·F_y·A_b (más conservador que el 0,8·F_y de §E.6.2.1.2)
-
-Procedimiento completo (``check_anchorage_J``, §E.6.2.1.1.1):
-    4. J = M_rw / (D² · [w_t·(1 − 0,4·A_v) + w_a − 0,4·w_int])
-       con w_t, w_a y w_int en fuerza POR UNIDAD DE PERÍMETRO (kN/m):
-       w_t = peso de manto + techo / (π·D), w_a = fuerza resistente del anillo de
-       fondo (§E.6.2.1.1.1), w_int = levantamiento por presión interna / (π·D).
-       J <= 0,785  → autoanclado sin levantamiento
-       0,785 < J <= 1,54 → autoanclado con levantamiento (comprobar L y t_a)
-       J > 1,54   → anclaje mecánico
-    5. N_b = P_a / (φ·A_b·F_y) — número de pernos
-    6. Silleta: espesor de placa base y longitud de anclaje
-
-Hasta 2026-10-31 el J dividía por el peso TOTAL W_t en vez de por el peso por
-unidad de perímetro (factor π·D de error, siempre «autoanclado») y la memoria le
-pasaba el peso del LÍQUIDO como W_t.
 """
 from __future__ import annotations
 
@@ -31,15 +10,6 @@ from typing import Any
 
 @dataclass(frozen=True)
 class AnchorageInput:
-    """Entrada de la comprobación simple de pernos.
-
-    Args:
-        D_m: diámetro del estanque [m].
-        W_tank_kN: peso de manto + techo + accesorios que gravita sobre el anillo
-            de anclaje [kN]. NO incluye el líquido (§E.6.2.1.2 usa w_t).
-        M_overturn_kNm: momento volcante en la base del manto M_rw [kN·m].
-        n_bolts, bolt_diameter_mm, bolt_Fy_MPa: pernos.
-    """
     D_m: float
     W_tank_kN: float
     M_overturn_kNm: float
@@ -67,7 +37,7 @@ class AnchorageResult:
 
 
 # ---------------------------------------------------------------------------
-# §E.6.2.1.1.1 — fuerza resistente del anillo de fondo
+# §E.6.2.1.1.1 — fuerza resistente del anillo de fondo y longitud L (§E.6.2.1.1.2)
 # ---------------------------------------------------------------------------
 
 def annulus_resisting_force_kN_m(t_a_mm: float, Fy_MPa: float, H_m: float,
@@ -75,9 +45,6 @@ def annulus_resisting_force_kN_m(t_a_mm: float, Fy_MPa: float, H_m: float,
     """Fuerza resistente del anillo de fondo w_a por unidad de perímetro (API 650 §E.6.2.1.1.1).
 
         w_a = 99 · t_a · sqrt(F_y · H · G_e)   [N/m]    <=  201,1 · H · D · G_e   [N/m]
-
-    con t_a en mm (espesor del anillo menos corrosión), F_y en MPa, H y D en m y
-    G_e = G·(1 − 0,4·A_v). El tope solo se aplica si se da D. Devuelve kN/m.
     """
     if min(t_a_mm, Fy_MPa, H_m, G_e) <= 0:
         raise ValueError("t_a, F_y, H y G_e deben ser > 0")
@@ -89,30 +56,37 @@ def annulus_resisting_force_kN_m(t_a_mm: float, Fy_MPa: float, H_m: float,
     return w_a / 1000.0
 
 
+def self_anchored_uplift_length_api650(
+    t_a_mm: float,
+    Fy_MPa: float,
+    H_m: float,
+    G_e: float = 1.0,
+    D_m: float | None = None,
+) -> dict[str, float | bool | None]:
+    """Longitud radial de levantamiento del fondo L según API 650 §E.6.2.1.1.2 (SI).
+
+        L = 0.01723 · t_a · sqrt(F_y / (H · G_e))   [m]
+        L_max = 0.035 · D                           [m]
+    """
+    if min(t_a_mm, Fy_MPa, H_m, G_e) <= 0:
+        raise ValueError("t_a, F_y, H y G_e deben ser > 0")
+    L_m = 0.01723 * t_a_mm * sqrt(Fy_MPa / (H_m * G_e))
+    L_max_m = 0.035 * D_m if D_m is not None else None
+    within_limit = (L_m <= L_max_m) if L_max_m is not None else True
+    return {
+        "L_uplift_m": L_m,
+        "L_max_0035D_m": L_max_m,
+        "L_governed_m": min(L_m, L_max_m) if L_max_m is not None else L_m,
+        "within_0035D_limit": within_limit,
+    }
+
+
 # ---------------------------------------------------------------------------
 # J-ratio (API 650 §E.6.2.1.1.1)
 # ---------------------------------------------------------------------------
 
 @dataclass(frozen=True)
 class AnchorageJInput:
-    """Entrada para la relación de anclaje J de API 650 §E.6.2.1.1.1.
-
-    Args:
-        D_m: diámetro del estanque [m].
-        M_rw_kNm: momento volcante en la base del manto (ringwall) [kN·m].
-        W_t_kN: peso TOTAL de manto + techo (+ accesorios) que gravita sobre el
-            anillo [kN]; se convierte a w_t = W_t/(π·D). NO incluye el líquido.
-        W_int_kN: fuerza total de levantamiento por presión interna [kN]
-            (cero en tanques atmosféricos); se convierte a w_int = W_int/(π·D).
-        w_a_kN_m: fuerza resistente del anillo de fondo por unidad de perímetro
-            [kN/m] (``annulus_resisting_force_kN_m``). None = 0 (sin crédito del
-            líquido sobre el anillo: conservador para J).
-        A_v: coeficiente de aceleración vertical (§E.6.1.3); reduce w_t.
-        Fp_kN: levantamiento total neto impuesto [kN]. Si None,
-            Fp = max(0, 4·M_rw/D − W_t·(1 − 0,4·A_v)) (§E.6.2.1.2, anclaje mecánico).
-        bolt_diameter_mm, bolt_Fy_MPa, phi_bolt: pernos (LRFD).
-        Fy_plate_MPa, f_bearing_MPa: silleta y apoyo sobre hormigón.
-    """
     D_m: float
     M_rw_kNm: float
     W_t_kN: float
@@ -129,17 +103,16 @@ class AnchorageJInput:
 
 @dataclass(frozen=True)
 class AnchorageJResult:
-    """Resultado de la relación J + diseño de anclaje."""
     J: float
-    anchorage_type: str       # "self-anchored" | "conditioned" | "mechanically-anchored"
+    anchorage_type: str
     N_bolts_required: int
-    Ab_mm2: float             # área de un perno
-    Fp_kN: float              # levantamiento total neto
-    t_base_plate_mm: float    # espesor mínimo de la placa base (silleta)
-    L_anchor_mm: float        # longitud de anclaje mínima (desarrollo)
+    Ab_mm2: float
+    Fp_kN: float
+    t_base_plate_mm: float
+    L_anchor_mm: float
     is_self_anchored: bool
-    w_t_kN_m: float = 0.0     # peso de manto + techo por unidad de perímetro
-    w_a_kN_m: float = 0.0     # fuerza resistente del anillo usada
+    w_t_kN_m: float = 0.0
+    w_a_kN_m: float = 0.0
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -171,7 +144,6 @@ def check_anchorage_J(inp: AnchorageJInput) -> AnchorageJResult:
     w_int = inp.W_int_kN / perimetro
     w_a = inp.w_a_kN_m or 0.0
 
-    # --- J (§E.6.2.1.1.1), fuerzas por unidad de perímetro ---
     denominator = D ** 2 * (w_t * (1.0 - 0.4 * inp.A_v) + w_a - 0.4 * w_int)
     if denominator <= 0:
         J = float("inf")
@@ -186,24 +158,20 @@ def check_anchorage_J(inp: AnchorageJInput) -> AnchorageJResult:
         anchorage_type = "mechanically-anchored"
     is_self_anchored = J <= 0.785
 
-    # --- Levantamiento total neto (§E.6.2.1.2, anclaje mecánico: sin crédito de w_a) ---
     if inp.Fp_kN is not None:
         Fp = inp.Fp_kN
     else:
         Fp = max(0.0, 4.0 * inp.M_rw_kNm / D - inp.W_t_kN * (1.0 - 0.4 * inp.A_v))
 
-    # --- Número de pernos: N_b = P_a / (φ·Ab·Fy) ---
     Ab_mm2 = pi * inp.bolt_diameter_mm ** 2 / 4.0
-    capacity_per_bolt_kN = inp.phi_bolt * Ab_mm2 * inp.bolt_Fy_MPa / 1000.0  # kN
+    capacity_per_bolt_kN = inp.phi_bolt * Ab_mm2 * inp.bolt_Fy_MPa / 1000.0
     if Fp <= 0 or capacity_per_bolt_kN <= 0:
-        N_bolts = 4  # mínimo constructivo
+        N_bolts = 4
     else:
         N_bolts = max(4, ceil(Fp / capacity_per_bolt_kN))
 
-    # --- Silleta: t_bp = d_bolt · sqrt(Fy_bolt / Fy_plate) (flexión local alrededor del perno) ---
     t_bp_mm = inp.bolt_diameter_mm * sqrt(inp.bolt_Fy_MPa / inp.Fy_plate_MPa)
 
-    # --- Longitud de anclaje: L = Fy · db / (4 · f_bearing) (desarrollo simplificado) ---
     if inp.f_bearing_MPa > 0:
         L_anchor_mm = inp.bolt_Fy_MPa * inp.bolt_diameter_mm / (4.0 * inp.f_bearing_MPa)
     else:
@@ -229,13 +197,11 @@ def check_anchorage(inp: AnchorageInput) -> AnchorageResult:
     if inp.D_m <= 0 or inp.bolt_diameter_mm <= 0:
         raise ValueError("D_m y bolt_diameter_mm deben ser > 0")
 
-    # Carga por perno — API 650 §E.6.2.1.2 con w_t = W_tank/(π·D)
     F_up = max(0.0, (4.0 * inp.M_overturn_kNm - inp.W_tank_kN * inp.D_m) /
                (inp.n_bolts * inp.D_m))
 
-    # Capacidad axial del perno (kN), 60 % de la fluencia (§E.6.2.1.2 admite 0,8·F_y)
     A_b_mm2 = pi * inp.bolt_diameter_mm ** 2 / 4.0
-    F_all = 0.6 * inp.bolt_Fy_MPa * A_b_mm2 / 1000.0  # kN
+    F_all = 0.6 * inp.bolt_Fy_MPa * A_b_mm2 / 1000.0
 
     DCR = F_up / F_all if F_all > 0 else float("inf")
     is_safe = DCR <= 1.0
@@ -243,7 +209,6 @@ def check_anchorage(inp: AnchorageInput) -> AnchorageResult:
     if F_up <= 0:
         n_req = inp.n_bolts
     else:
-        # F_up = (4M − W·D)/(n_b·D) <= F_all → n_b >= (4M − W·D)/(D·F_all)
         n_req = int(max(4, ((4 * inp.M_overturn_kNm - inp.W_tank_kN * inp.D_m)
                             / (inp.D_m * F_all)) + 1))
 
@@ -257,4 +222,5 @@ __all__ = [
     "AnchorageInput", "AnchorageResult", "check_anchorage",
     "AnchorageJInput", "AnchorageJResult", "check_anchorage_J",
     "annulus_resisting_force_kN_m",
+    "self_anchored_uplift_length_api650",
 ]

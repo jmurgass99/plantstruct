@@ -7,21 +7,12 @@ Esfuerzos:
     σ_hoop   = γ·H_l·D/(2·t)   tracción anular por la presión hidrostática
     σ_cr,ax  = α·E·t/R        pandeo axial, α = 0,6 (API 650 §5.10.3)
     σ_b      = flexión por momento volcante (solo en la verificación completa)   [entrada]
-
-QUÉ ES CADA COMPROBACIÓN
-------------------------
-La tracción anular NO pandea: se compara con la tensión admisible del material
-S_d (API 650 Tabla 5-2a; para la combinación sísmica §E.6.1.4 admite 1,333·S_d,
-que el usuario pasa en ``Sd_MPa``). Hasta 2026-11-01 ambas funciones comparaban
-esa tracción con la tensión crítica de Donnell a presión EXTERIOR
-(0,92·E·(t/R)^1,5·R/L, del orden de 2–4 MPa en un tanque de 20 m), de modo que
-cualquier tanque lleno salía con DCR_hoop de 40 a 150 y «NO CUMPLE» por pandeo.
-El pandeo circunferencial por vacío sí existe y lo cubre
-``plantstruct.external_pressure`` (ASME VIII UG-28 / API 650 §5.9.7).
+    F_C      = pandeo admisible sísmico API 650 §E.6.2.2.3 (estabilizado por presión interna)
 """
 from __future__ import annotations
 
 from dataclasses import dataclass
+import math
 from typing import Any
 
 
@@ -65,6 +56,33 @@ def _hoop_stress_MPa(gamma_l_kN_m3: float, H_liquid_m: float, D_m: float, t_mm: 
     return gamma_l_kN_m3 * H_liquid_m * D_m / (2.0 * t_mm / 1000.0) / 1000.0
 
 
+def api650_allowable_shell_buckling_stress_fc(
+    D_m: float,
+    t_mm: float,
+    H_liquid_m: float,
+    Fy_MPa: float,
+    G: float = 1.0,
+) -> float:
+    """Esfuerzo admisible de compresión longitudinal F_C según API 650 §E.6.2.2.3 (unidades SI).
+
+    Parámetro de esbeltez hidrostática:
+        g_hd = G · H · D² / t²   (con H y D en m, t en mm)
+      - Si g_hd >= 44:  F_C = 83 · t / D <= 0.5 · F_ty
+      - Si g_hd <  44:  F_C = 83 · t / (2.5 · D) + 7.5 · sqrt(G · H) <= 0.5 · F_ty
+    """
+    _validar_geometria(D_m, t_mm, "api650_allowable_shell_buckling_stress_fc")
+    if Fy_MPa <= 0:
+        raise ValueError("Fy_MPa debe ser > 0")
+    if H_liquid_m < 0 or G <= 0:
+        raise ValueError("H_liquid_m >= 0 y G > 0 requeridos")
+    ghd = G * H_liquid_m * (D_m ** 2) / (t_mm ** 2)
+    if ghd >= 44.0:
+        fc = 83.0 * t_mm / D_m
+    else:
+        fc = 83.0 * t_mm / (2.5 * D_m) + 7.5 * math.sqrt(G * H_liquid_m)
+    return min(fc, 0.5 * Fy_MPa)
+
+
 def check_shell_buckling(inp: ShellBucklingInput,
                           alpha_imperfection: float = 0.6
                           ) -> ShellBucklingResult:
@@ -100,20 +118,7 @@ def check_shell_buckling(inp: ShellBucklingInput,
 
 @dataclass(frozen=True)
 class ShellBucklingFullInput:
-    """Entrada para verificación completa de pandeo del manto.
-
-    Args:
-        D_m: diámetro del estanque [m].
-        H_shell_m: altura total del manto [m].
-        H_liquid_m: altura del líquido [m].
-        t_shell_mm: espesor del manto [mm].
-        sigma_axial_imposed_MPa: esfuerzo axial impuesto (techo, cargas externas) [MPa].
-        sigma_bending_MPa: esfuerzo de flexión por momento volcante sísmico [MPa].
-        E_MPa: módulo de elasticidad del acero [MPa].
-        gamma_l_kN_m3: peso específico del líquido [kN/m³].
-        alpha_imperfection: factor de imperfección API 650 §5.10.3 (0.6 típico).
-        Sd_MPa: tensión admisible del manto para la tracción anular [MPa].
-    """
+    """Entrada para verificación completa de pandeo del manto."""
     D_m: float
     H_shell_m: float
     H_liquid_m: float
@@ -124,49 +129,37 @@ class ShellBucklingFullInput:
     gamma_l_kN_m3: float = 9.81
     alpha_imperfection: float = 0.6
     Sd_MPa: float = 160.0
+    Fy_MPa: float | None = None
 
 
 @dataclass(frozen=True)
 class ShellBucklingFullResult:
     """Resultado completo de pandeo del manto."""
-    # Demandas
     sigma_axial_demand_MPa: float
     sigma_hoop_demand_MPa: float
     sigma_bending_demand_MPa: float
 
-    # Capacidades
-    Fbi_axial_MPa: float          # pandeo axial API 650 §E.6.2.2.3 (α·E·t/R)
-    Fh_hoop_allowable_MPa: float  # tracción anular admisible S_d
-    Fb_bending_MPa: float         # pandeo por flexión (esbeltos)
+    Fbi_axial_MPa: float
+    Fh_hoop_allowable_MPa: float
+    Fb_bending_MPa: float
 
-    # Ratios individuales
     DCR_axial: float
-    DCR_hoop: float               # utilización a TRACCIÓN anular
+    DCR_hoop: float
     DCR_bending: float
-
-    #: DCR axial si gobernase el knockdown de Rotter en vez del factor de
-    #: imperfección de entrada. NO interviene en `is_safe`; se publica porque el
-    #: resultado ya traía las dos capacidades y ninguna pista de cuál mandaba.
-    #: La brecha es 0.6·(1 + 0.005·R/t): 2.4x a R/t=600, 8.1x a R/t=2500.
     DCR_axial_diamond: float
-
-    # Interacción cuadrática de compresiones: (fa/Fa)² + (fb/Fb)² ≤ 1.0
     DCR_interaction: float
 
-    # Rotter diamond knockdown
     alpha_diamond: float
     Fbi_diamond_MPa: float
 
     is_safe: bool
-    governing_mode: str           # "axial" | "hoop" | "bending" | "interaction"
+    governing_mode: str
 
-    #: Qué capacidad axial sostiene el veredicto. Publicar dos capacidades y un
-    #: solo `is_safe` sin decir cuál gobierna es lo que hacía invisible un
-    #: factor de hasta 8.
     axial_basis: str = "API650_alpha_imperfection"
+    Fc_api650_e6223_MPa: float | None = None
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        d: dict[str, Any] = {
             "sigma_axial_demand_MPa": self.sigma_axial_demand_MPa,
             "sigma_hoop_demand_MPa": self.sigma_hoop_demand_MPa,
             "sigma_bending_demand_MPa": self.sigma_bending_demand_MPa,
@@ -184,16 +177,12 @@ class ShellBucklingFullResult:
             "governing_mode": self.governing_mode,
             "axial_basis": self.axial_basis,
         }
+        if self.Fc_api650_e6223_MPa is not None:
+            d["Fc_api650_e6223_MPa"] = self.Fc_api650_e6223_MPa
+        return d
 
 
 def _validar_geometria(D_m: float, t_shell_mm: float, quien: str) -> None:
-    """Rechaza geometrías imposibles antes de que la aritmética las disfrace.
-
-    Con espesor negativo, ``(t/R)**1.5`` devuelve un COMPLEJO y la comparación
-    ``> 0`` estalla en ``TypeError`` cincuenta líneas más abajo del sitio donde se
-    puede arreglar. Un espesor o un diámetro no positivos son datos malos (una
-    extracción mal parseada, unas unidades equivocadas), y merecen decirlo así.
-    """
     if not D_m > 0:
         raise ValueError(f"{quien}: D_m={D_m:g} m debe ser > 0")
     if not t_shell_mm > 0:
@@ -204,78 +193,45 @@ def _validar_geometria(D_m: float, t_shell_mm: float, quien: str) -> None:
 
 
 def _rotter_diamond_knockdown(R_mm: float, t_mm: float) -> float:
-    """Factor knockdown de Rotter para pandeo diamante (imperfecciones).
-
-    Rotter (1997): α = 1 / (1 + 0.005 · R/t)
-    Para R/t grandes → α tiende a 0 (muy sensible a imperfecciones).
-    Para R/t pequeños → α tiende a ~1.
-    """
     Rt = R_mm / t_mm if t_mm > 0 else float("inf")
     return 1.0 / (1.0 + 0.005 * Rt)
 
 
 def check_shell_buckling_full(inp: ShellBucklingFullInput
                                ) -> ShellBucklingFullResult:
-    """Verificación completa del manto.
-
-    Modos:
-        1. Pandeo axial (API 650 §E.6.2.2.3 simplificado): Fbi = α·E·t/R
-        2. Tracción anular hidrostática: σ_hoop ≤ S_d  (no es pandeo)
-        3. Pandeo por flexión: Fb = (t²·E)/(R·H) para esbeltos
-        4. Interacción de compresiones: (fa/Fa)² + (fb/Fb)² ≤ 1.0
-        5. Pandeo diamante (Rotter): factor knockdown, publicado como DCR_axial_diamond
-
-    QUÉ CAPACIDAD SOSTIENE EL VEREDICTO
-    -----------------------------------
-    `is_safe`, `DCR_axial` y `governing_mode` van por la ruta 1, con el
-    `alpha_imperfection` de entrada (0.6 por defecto).  El resultado publica
-    ADEMÁS `Fbi_diamond_MPa` (ruta 5) y `DCR_axial_diamond`, porque las dos
-    capacidades convivían en la salida sin ninguna pista de cuál mandaba.  La
-    brecha entre ambas es la forma cerrada ``α·(1 + 0.005·R/t)``, que con
-    α = 0.6 da 2.4x a R/t = 600 y 8.1x a R/t = 2500 — crece con la esbeltez, no
-    es una constante.  Medido en un tanque de 30 m × 6 mm: DCR publicado 0.104,
-    DCR por Rotter 0.844.
-
-    Cuál debe gobernar es una decisión de norma y NO se toma aquí: se deja donde
-    estaba y se hace visible la otra.  `axial_basis` lo declara en la salida.
-    """
+    """Verificación completa del manto."""
     _validar_geometria(inp.D_m, inp.t_shell_mm, "check_shell_buckling_full")
     R_mm = inp.D_m * 1000.0 / 2.0
     t = inp.t_shell_mm
     L_mm = inp.H_shell_m * 1000.0
     E = inp.E_MPa
 
-    # --- Demandas ---
     sigma_axial = inp.sigma_axial_imposed_MPa
     sigma_bending = inp.sigma_bending_MPa
     sigma_hoop = _hoop_stress_MPa(inp.gamma_l_kN_m3, inp.H_liquid_m, inp.D_m, t)
 
-    # --- Capacidades ---
-    # 1. Pandeo axial: Fbi = α_imp · E · t / R
     Fbi_axial = inp.alpha_imperfection * E * t / R_mm
-    # 2. Tracción anular: admisible S_d
     Fh_hoop = inp.Sd_MPa
-    # 3. Pandeo por flexión (mantos esbeltos H/D >> 1): Fb = E·t²/(R·H_shell) [Timoshenko aprox.]
     Fb_bending = E * t ** 2 / (R_mm * max(L_mm, 1.0))
 
-    # --- DCR individuales ---
-    # Capacidad <= 0 -> infinito, NO cero. Cero es el valor de "sobra margen": un
-    # manto sin capacidad salía por la API como seguro (medido: con E=0 los DCR
-    # daban 0.0 e is_safe True, con 134.9 MPa de demanda circunferencial).
     DCR_axial = sigma_axial / Fbi_axial if Fbi_axial > 0 else float("inf")
     DCR_hoop = sigma_hoop / Fh_hoop if Fh_hoop > 0 else float("inf")
     DCR_bending = sigma_bending / Fb_bending if Fb_bending > 0 else float("inf")
 
-    # --- Interacción cuadrática de compresiones: (fa/Fa)² + (fb/Fb)² ≤ 1.0 ---
     DCR_interaction = DCR_axial ** 2 + DCR_bending ** 2
 
-    # --- Rotter diamond knockdown ---
     alpha_diamond = _rotter_diamond_knockdown(R_mm, t)
     Fbi_diamond = alpha_diamond * E * t / R_mm
     DCR_axial_diamond = (sigma_axial / Fbi_diamond if Fbi_diamond > 0
                          else float("inf"))
 
-    # --- Governing mode ---
+    fc_e6223 = None
+    if inp.Fy_MPa is not None and inp.Fy_MPa > 0 and inp.H_liquid_m >= 0:
+        G_rel = max(inp.gamma_l_kN_m3 / 9.81, 0.1)
+        fc_e6223 = api650_allowable_shell_buckling_stress_fc(
+            inp.D_m, t, inp.H_liquid_m, inp.Fy_MPa, G=G_rel
+        )
+
     dcr_max = max(DCR_axial, DCR_hoop, DCR_bending)
     if DCR_interaction > 1.0:
         governing = "interaction"
@@ -305,10 +261,12 @@ def check_shell_buckling_full(inp: ShellBucklingFullInput
         Fbi_diamond_MPa=Fbi_diamond,
         is_safe=is_safe,
         governing_mode=governing,
+        Fc_api650_e6223_MPa=fc_e6223,
     )
 
 
 __all__ = [
     "ShellBucklingInput", "ShellBucklingResult", "check_shell_buckling",
     "ShellBucklingFullInput", "ShellBucklingFullResult", "check_shell_buckling_full",
+    "api650_allowable_shell_buckling_stress_fc",
 ]

@@ -20,6 +20,7 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
     "Topic :: Scientific/Engineering",
+    "Typing :: Typed",
 ]
 dependencies = ["numpy>=1.26"]
 
@@ -34,6 +35,9 @@ Issues = "https://github.com/jmurgass99/plantstruct/issues"
 
 [tool.setuptools.packages.find]
 include = ["plantstruct*"]
+
+[tool.setuptools.package-data]
+plantstruct = ["py.typed"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
