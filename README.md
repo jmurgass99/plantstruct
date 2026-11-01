@@ -1,5 +1,7 @@
 # plantstruct — estructuras de planta industrial: tanques API 650, silos EN 1991-4, chimeneas, esferas, pipe racks, bases de columna y vigas mixtas
 
+**Español** · [English](README.en.md) · [Português](README.pt.md) · [Italiano](README.it.md)
+
 Cálculo de estructuras de planta de proceso en Python puro con `numpy` como única dependencia: tanques atmosféricos API 650 (virolas por el método del pie, tracción anular, pandeo del manto, presión exterior, masas de Housner del Anexo E con periodos, cortante y momento SRSS, relación de anclaje J y pernos, memoria completa, modelo de barra para SAP2000 y la variante ASCE 7-22 §15.7), silos EN 1991-4 (Janssen, clases de esbeltez, factores de descarga, carga parcheada, canal de flujo y pandeo meridional EN 1993-1-6), chimeneas (desprendimiento de vórtices), esferas de GLP (ASME VIII), pipe racks, naves (viento EN 1991-1-4 y flexocompresión EN 1993-1-1), muros antiexplosión SDOF, bases de columna con los cuatro modos de anclaje de ACI 318-19 cap. 17 y llave de cortante, anclajes multinorma y vigas mixtas de entrepiso por AISC 360 y EN 1994. Cada resultado dice qué hipótesis lleva dentro y cuándo no ha podido verificar.
 
 [![CI](https://github.com/jmurgass99/plantstruct/actions/workflows/ci.yml/badge.svg)](https://github.com/jmurgass99/plantstruct/actions/workflows/ci.yml)
