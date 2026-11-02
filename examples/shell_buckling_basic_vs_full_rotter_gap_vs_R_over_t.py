@@ -19,6 +19,8 @@ from plantstruct.tanks import (
     check_shell_buckling,
     check_shell_buckling_full,
 )
+from plantstruct.tanks.shell_buckling import api650_allowable_shell_buckling_stress_fc
+import math
 
 D, H_SHELL, H_LIQ = 20.0, 16.0, 15.0
 SIGMA_AX, SIGMA_B = 15.0, 10.0
@@ -39,6 +41,16 @@ def main() -> None:
     print(f"\n`axial_basis` = {f.axial_basis}: el veredicto usa α = 0,6; la columna de Rotter es la otra lectura de la misma demanda.")
     print("Con 6 y 8 mm manda la tracción anular (σ_hoop > S_d: hace falta el espesor del método del pie, 10,5 mm en la primera virola); "
           "con 12 y 20 mm el manto cumple y el axial queda holgado por la ruta API, no tanto por la de Rotter.")
+
+    print("\nF_C de API 650 §E.6.2.2.3 (sísmico, con F_y = 250 MPa; informativo: no entra en el veredicto):")
+    for t in (6.0, 8.0, 12.0, 20.0):
+        f = check_shell_buckling_full(ShellBucklingFullInput(D, H_SHELL, H_LIQ, t, sigma_axial_imposed_MPa=SIGMA_AX,
+                                                             sigma_bending_MPa=SIGMA_B, Fy_MPa=250.0))
+        ghd = H_LIQ * D ** 2 / t ** 2
+        hand = 83 * t / D if ghd >= 44 else 83 * t / (2.5 * D) + 7.5 * math.sqrt(H_LIQ)
+        print(f"  t = {t:4.0f} mm: G·H·D²/t² = {ghd:6.1f} → F_C = {f.Fc_api650_e6223_MPa:5.1f} MPa (a mano {min(hand, 125.0):5.1f}); "
+              f"σ_axial/F_C = {SIGMA_AX / f.Fc_api650_e6223_MPa:.2f}")
+    assert abs(api650_allowable_shell_buckling_stress_fc(D, 12.0, H_LIQ, 250.0) - (83 * 12 / (2.5 * D) + 7.5 * math.sqrt(H_LIQ))) < 1e-9
 
 
 if __name__ == "__main__":

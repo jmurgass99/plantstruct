@@ -25,7 +25,7 @@ Le strutture degli impianti (serbatoi, silos, rack, ciminiere, basamenti di appa
 - serbatoi oltre i 60 m (metodo del punto di progetto variabile, API 650 §5.6.4), tetti galleggianti, fondi e fondazioni dei serbatoi;
 - silos con tramoggia (pressioni nella tramoggia, §6), scarico eccentrico dettagliato (§5.2.4.3) o silos in calcestruzzo;
 - ampiezza della vibrazione da vortici (numero di Scruton, EN 1991-1-4 eq. E.7): `chimneys` dà solo la condizione di risonanza ed è marcato sperimentale;
-- taglio sui tirafondi (ACI 318-19 §17.7) e interazione trazione-taglio (§17.8): il modulo affida il taglio all'attrito e al tacco;
+- taglio sui tirafondi (ACI 318-19 §17.7) dentro `disenar_base`: porta il taglio ad attrito e tacco; `check_anchor_shear_aci318_17_7` esiste a parte ma il suo pryout è a sfavore di sicurezza;
 - sollecitazioni nel guscio delle sfere per sisma o vento: `esferas_gpl` copre lo spessore per pressione e la ripartizione alle colonne.
 
 ## Installazione
@@ -35,7 +35,7 @@ pip install git+https://github.com/jmurgass99/plantstruct.git
 pip install "plantstruct[api] @ git+https://github.com/jmurgass99/plantstruct.git"   # API REST con FastAPI
 ```
 
-Per lo sviluppo: `git clone`, `pip install -e ".[test,api]"`, `pytest -q` (25 file di test). Su Windows, se la console non è UTF-8, esegui gli esempi con `python -X utf8 examples/<nome>.py`.
+Per lo sviluppo: `git clone`, `pip install -e ".[test,api]"`, `pytest -q` (27 file di test). Su Windows, se la console non è UTF-8, esegui gli esempi con `python -X utf8 examples/<nome>.py`.
 
 ## Funzionalità
 
@@ -124,6 +124,12 @@ D = 20 m, H_manto = 16 m, H_líquido = 15 m, σ_axial = 15.0 MPa, σ_flexión = 
 
 `axial_basis` = API650_alpha_imperfection: el veredicto usa α = 0,6; la columna de Rotter es la otra lectura de la misma demanda.
 Con 6 y 8 mm manda la tracción anular (σ_hoop > S_d: hace falta el espesor del método del pie, 10,5 mm en la primera virola); con 12 y 20 mm el manto cumple y el axial queda holgado por la ruta API, no tanto por la de Rotter.
+
+F_C de API 650 §E.6.2.2.3 (sísmico, con F_y = 250 MPa; informativo: no entra en el veredicto):
+  t =    6 mm: G·H·D²/t² =  166.7 → F_C =  24.9 MPa (a mano  24.9); σ_axial/F_C = 0.60
+  t =    8 mm: G·H·D²/t² =   93.8 → F_C =  33.2 MPa (a mano  33.2); σ_axial/F_C = 0.45
+  t =   12 mm: G·H·D²/t² =   41.7 → F_C =  49.0 MPa (a mano  49.0); σ_axial/F_C = 0.31
+  t =   20 mm: G·H·D²/t² =   15.0 → F_C =  62.2 MPa (a mano  62.2); σ_axial/F_C = 0.24
 ```
 
 </details>
@@ -255,6 +261,8 @@ W_t (manto + techo) = 755 kN → w_t = 12.0 kN/m
      0.40   0.188       46.6      79,952  3.461  mechanically-anchored    15,293         81
 
 Con A_i >= 0,15 g el tanque ya necesita anclaje mecánico; entre 0,05 y 0,10 g es autoanclado con levantamiento y hay que comprobar L y t_a (§E.6.2.1.1.2).
+  A_i = 0.05 g: L = 0,01723·t_a·√(F_y/(H·G_e)) = 0.565 m (a mano 0.565); límite 0,035·D = 0.70 m → dentro
+  A_i = 0.10 g: L = 0,01723·t_a·√(F_y/(H·G_e)) = 0.568 m (a mano 0.568); límite 0,035·D = 0.70 m → dentro
 F_p = 4·M_rw/D − W_t·(1 − 0,4·A_v) es el levantamiento total para anclaje mecánico (§E.6.2.1.2); el número de pernos usa φ·A_b·F_y.
 ```
 
@@ -550,6 +558,12 @@ IPE 400 S275, N_Ed = 250 kN, M_y,Ed = 180 kN·m, χ_y = 0,80, χ_LT = 0,85:
   status                           CUMPLE
   k_y_basis: EN 1993-1-1 Anexo B, Tabla B.1 (Metodo 2, clases 1-2) SIMPLIFICADA: k_y = min(1 + 0.6*n, 1.4), equivalente a C_my = 1.0 …
 
+k_yy con la fórmula de la Tabla B.1 (pasando λ̄_y; C_my = 1) frente a la histórica:
+  λ̄_y = 0.5: k_yy = 1.040 (a mano 1 + min(λ̄_y − 0,2; 0,8)·n_y = 1.040), ratio 0.828 frente a 0.854
+  λ̄_y = 0.8: k_yy = 1.081 (a mano 1 + min(λ̄_y − 0,2; 0,8)·n_y = 1.081), ratio 0.854 frente a 0.854
+  λ̄_y = 1.2: k_yy = 1.108 (a mano 1 + min(λ̄_y − 0,2; 0,8)·n_y = 1.108), ratio 0.872 frente a 0.854
+  λ̄_y = 1.6: k_yy = 1.108 (a mano 1 + min(λ̄_y − 0,2; 0,8)·n_y = 1.108), ratio 0.872 frente a 0.854
+
 tracción: ValueError → check_steel_member_interaction: N_Ed_kN=-300 kN es TRACCIÓN, y EN 1993-1-1 §6.3.3 cubre 'members in bending an…
 
 χ_y ausente: ValueError → check_steel_member_interaction: chi_y debe proporcionarse explícitamente. No se asumen factores de reducción p…
@@ -615,7 +629,15 @@ Llave de cortante: requerida = False (fricción 160 kN frente a V = 80 kN)
 Estado: VERIFICADO, cumple = False
 
 N_b(f'c = 25 MPa, h_ef = 300 mm) = 259.81 kN (k_c = 10 SI; con el 24 de libras-pulgada saldría 2,4 veces más)
-Los φ (0,75 acero, 0,70 hormigón) son entrada fija del módulo sin armadura suplementaria; §17.7 (cortante en anclajes) no se comprueba: el cortante va a fricción y llave.
+Los φ (0,75 acero, 0,70 hormigón) son entrada fija del módulo sin armadura suplementaria.
+
+Acero del perno §17.6.1.2 con A_se,N = 353 mm² (M24) y f_uta = 620 MPa: N_sa = 437.7 kN (a mano 2·353·620 = 437.7) frente a 380.0 kN por fluencia sobre el área bruta
+Cortante en anclajes §17.7 si el cortante lo toman los 4 pernos (sin fricción ni llave), V = 80 kN:
+  acero φV_sa                        341.4 kN
+  rotura de borde φV_cb               31.8 kN
+  arrancamiento por palanca φV_cp   2928.0 kN
+  utilización a cortante 2.52; interacción §17.8 (exponente 5/3) 29.49 → is_ok = False
+  V_cp usa N_cp = n·N_b = 4·522.9 = 2091 kN, sin solape de conos ni bordes: 15 veces el cono de grupo de tracción del propio módulo (138.6 kN, 2 pernos). φV_cp queda muy del lado inseguro; aquí gobierna la rotura de borde.
 ```
 
 </details>
@@ -819,12 +841,12 @@ D = 0 en full-design → 422 (validación Pydantic)
 
 - `Sa_i` e `Sa_c` sono i coefficienti A_i e A_c già divisi per R_w/I: il pacchetto non costruisce lo spettro della API 650 §E.4.6 a partire da S_S, S_1 e classe del sito.
 - Il momento ribaltante è quello alla base del mantello (ringwall): non include la pressione sul fondo (M_s del §E.6.1.5-2) né il peso del fondo.
-- `check_anchorage` usa 0,6·F_y come capacità del tirafondo (la norma ammette 0,8·F_y) e `check_anchorage_J` dimensiona la sedia con formule semplificate; la verifica di autoancoraggio con sollevamento (L e t_a del §E.6.2.1.1.2) non c'è.
-- L'instabilità assiale del mantello è α·E·t/R con α = 0,6; la formula di F_C del §E.6.2.2.3 (83·t_s/D o il ramo GHD²/t²) non è implementata. Il knockdown di Rotter si pubblica ma non governa.
+- `check_anchorage` usa 0,6·F_y come capacità del tirafondo (la norma ammette 0,8·F_y) e `check_anchorage_J` dimensiona la sedia con formule semplificate. La lunghezza di sollevamento L del §E.6.2.1.1.2 è in `tanks.anchorage.self_anchored_uplift_length_api650` (non esportata da `plantstruct.tanks`); lo spessore t_a non si verifica.
+- L'instabilità assiale del mantello è α·E·t/R con α = 0,6. F_C del §E.6.2.2.3 si calcola se si passa `Fy_MPa` a `ShellBucklingFullInput`, ma è informativo: non entra nel verdetto. Il knockdown di Rotter si pubblica ma non governa.
 - `asce7_15_7` assume T_i = 0 se non si fornisce lo spessore e non valuta S_ai oltre T_L; i fattori R sono dati in ingresso.
 - `chimneys`, `esferas_gpl` e `pipe_rack` sono predimensionamento con coefficienti sismici di screening (C_s fisso per norma), senza spettro.
-- `portal_frame.check_steel_member_interaction` usa k_y = min(1 + 0,6·n, 1,4), equivalente alla Tabella B.1 con C_my = 1 e λ̄_y = 0,8 fissi; per colonne più snelle sottostima k_yy e il risultato lo dichiara in `k_y_basis`.
-- `bases_columna`: la capacità dell'acciaio del tirafondo è lo snervamento sull'area lorda (non A_se·f_uta del §17.6.1.2); il tacco a taglio ha altezza e spessore fissi; §17.7 e §17.8 non si verificano; con P ≤ 0 non si ricava la domanda di trazione.
+- `portal_frame.check_steel_member_interaction` usa per impostazione predefinita k_y = min(1 + 0,6·n, 1,4), equivalente alla Tabella B.1 con C_my = 1 e λ̄_y = 0,8 fissi (sottostima k_yy per colonne più snelle e lo dichiara in `k_y_basis`); con `lambda_y` (e `C_my`) applica la Tabella B.1, Metodo 2, Classi 1-2.
+- `bases_columna`: per impostazione predefinita la capacità dell'acciaio del tirafondo è lo snervamento sull'area lorda; con `futa_MPa` e `Ase_N_mm2` usa A_se·f_uta del §17.6.1.2. Il tacco a taglio ha altezza e spessore fissi; con P ≤ 0 non si ricava la domanda di trazione. `check_anchor_shear_aci318_17_7` (§17.7 e interazione 5/3 del §17.8) non è chiamata da `disenar_base` e semplifica: V_cp = k_cp·n·N_b senza sovrapposizione dei coni né bordi (molto a sfavore di sicurezza, vedi il caso della piastra con grande eccentricità), A_Vc senza l'interasse tra i tirafondi, senza ψ_h,V e f_uta limitata solo a 860 MPa.
 - `anchor_codes` copre solo il cono di un ancoraggio senza bordi moltiplicato per il numero di ancoraggi.
 - Le travi composte presuppongono campata semplice, carico uniforme più un concentrato in mezzeria, lamiera perpendicolare con una fila di connettori; la freccia con connessione parziale usa l'approssimazione della AISC I3.2 anche nel ramo EN 1994.
 - `report_api650` è uno scheletro delle sezioni dell'Allegato E, non una relazione calcolata: la relazione calcolata è `memos.render_tank_memo`.

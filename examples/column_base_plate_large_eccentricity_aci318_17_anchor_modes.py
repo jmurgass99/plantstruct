@@ -10,7 +10,7 @@ elige el mínimo. N_b = k_c·√f'c·h_ef^1,5 con k_c = 10 en SI: para f'c = 25 
 
 Ejecutar:  python examples/column_base_plate_large_eccentricity_aci318_17_anchor_modes.py
 """
-from plantstruct.bases_columna import BaseColumnaInput, Nb_kN, disenar_base
+from plantstruct.bases_columna import BaseColumnaInput, Nb_kN, check_anchor_shear_aci318_17_7, disenar_base
 
 
 def main() -> None:
@@ -30,7 +30,25 @@ def main() -> None:
     print(f"Llave de cortante: requerida = {r.shear_lug.required} (fricción {r.shear_lug.shear_friction_capacity_kN:.0f} kN frente a V = {r.shear_lug.shear_demand_kN:.0f} kN)")
     print(f"Estado: {r.verification_status}, cumple = {r.cumple}")
     print(f"\nN_b(f'c = 25 MPa, h_ef = 300 mm) = {Nb_kN(25.0, 300.0):.2f} kN (k_c = 10 SI; con el 24 de libras-pulgada saldría 2,4 veces más)")
-    print("Los φ (0,75 acero, 0,70 hormigón) son entrada fija del módulo sin armadura suplementaria; §17.7 (cortante en anclajes) no se comprueba: el cortante va a fricción y llave.")
+    print("Los φ (0,75 acero, 0,70 hormigón) son entrada fija del módulo sin armadura suplementaria.")
+
+    kw = dict(P_kN=400.0, V_kN=80.0, M_kNm=260.0, bf_mm=300.0, d_mm=300.0, fy_MPa=235.0, fc_MPa=30.0, fyb_MPa=420.0,
+              n_anchors=4, db_anchor_mm=24.0, hef_mm=450.0, ca1_mm=200.0, ca2_mm=250.0, s_anchor_mm=200.0,
+              Abrg_mm2=1000.0, cracked_concrete=True, cast_in=True)
+    r2 = disenar_base(BaseColumnaInput(**kw, futa_MPa=620.0, Ase_N_mm2=353.0))
+    print(f"\nAcero del perno §17.6.1.2 con A_se,N = 353 mm² (M24) y f_uta = 620 MPa: N_sa = {r2.anchor_tension.steel_capacity_kN:.1f} kN "
+          f"(a mano 2·353·620 = {2 * 353 * 620 / 1000:.1f}) frente a {a.steel_capacity_kN:.1f} kN por fluencia sobre el área bruta")
+    v = check_anchor_shear_aci318_17_7(Vu_kN=80.0, n_anchors=4, db_anchor_mm=24.0, futa_MPa=620.0, fc_MPa=30.0, hef_mm=450.0,
+                                       ca1_mm=200.0, ca2_mm=250.0, Ase_V_mm2=353.0, Tu_kN=r2.Tu_anchor_kN,
+                                       phi_Nn_kN=r2.anchor_tension.governing_capacity_kN)
+    print("Cortante en anclajes §17.7 si el cortante lo toman los 4 pernos (sin fricción ni llave), V = 80 kN:")
+    for k, lbl in (("Vsa_design_kN", "acero φV_sa"), ("Vcb_design_kN", "rotura de borde φV_cb"), ("Vcp_design_kN", "arrancamiento por palanca φV_cp")):
+        print(f"  {lbl:31} {v[k]:8.1f} kN")
+    print(f"  utilización a cortante {v['shear_utilization']:.2f}; interacción §17.8 (exponente 5/3) {v['interaction_ratio_17_8']:.2f} → is_ok = {v['is_ok']}")
+    ncp = 4 * Nb_kN(30.0, 450.0)
+    print(f"  V_cp usa N_cp = n·N_b = 4·{Nb_kN(30.0, 450.0):.1f} = {ncp:.0f} kN, sin solape de conos ni bordes: "
+          f"{ncp / a.concrete_breakout_kN:.0f} veces el cono de grupo de tracción del propio módulo ({a.concrete_breakout_kN:.1f} kN, 2 pernos). "
+          "φV_cp queda muy del lado inseguro; aquí gobierna la rotura de borde.")
 
 
 if __name__ == "__main__":

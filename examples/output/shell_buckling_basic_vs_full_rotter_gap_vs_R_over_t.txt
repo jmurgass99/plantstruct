@@ -8,3 +8,9 @@ D = 20 m, H_manto = 16 m, H_líquido = 15 m, σ_axial = 15.0 MPa, σ_flexión = 
 
 `axial_basis` = API650_alpha_imperfection: el veredicto usa α = 0,6; la columna de Rotter es la otra lectura de la misma demanda.
 Con 6 y 8 mm manda la tracción anular (σ_hoop > S_d: hace falta el espesor del método del pie, 10,5 mm en la primera virola); con 12 y 20 mm el manto cumple y el axial queda holgado por la ruta API, no tanto por la de Rotter.
+
+F_C de API 650 §E.6.2.2.3 (sísmico, con F_y = 250 MPa; informativo: no entra en el veredicto):
+  t =    6 mm: G·H·D²/t² =  166.7 → F_C =  24.9 MPa (a mano  24.9); σ_axial/F_C = 0.60
+  t =    8 mm: G·H·D²/t² =   93.8 → F_C =  33.2 MPa (a mano  33.2); σ_axial/F_C = 0.45
+  t =   12 mm: G·H·D²/t² =   41.7 → F_C =  49.0 MPa (a mano  49.0); σ_axial/F_C = 0.31
+  t =   20 mm: G·H·D²/t² =   15.0 → F_C =  62.2 MPa (a mano  62.2); σ_axial/F_C = 0.24

@@ -28,6 +28,12 @@ def main() -> None:
         v = r[k]
         print(f"  {k:32} {v:.3f}" if isinstance(v, float) else f"  {k:32} {v}")
     print(f"  k_y_basis: {r['k_y_basis'][:120]}…")
+    print("\nk_yy con la fórmula de la Tabla B.1 (pasando λ̄_y; C_my = 1) frente a la histórica:")
+    for lam in (0.5, 0.8, 1.2, 1.6):
+        re = check_steel_member_interaction(N_Ed_kN=250.0, My_Ed_kNm=180.0, chi_y=0.80, chi_LT=0.85, lambda_y=lam, **IPE400)
+        n_y = 250e3 / (0.80 * IPE400["A_mm2"] * IPE400["fyi_MPa"])
+        print(f"  λ̄_y = {lam:.1f}: k_yy = {re['interaction_coefficient_ky']:.3f} (a mano 1 + min(λ̄_y − 0,2; 0,8)·n_y = "
+              f"{1 + min(lam - 0.2, 0.8) * n_y:.3f}), ratio {re['combined_interaction_ratio']:.3f} frente a {r['combined_interaction_ratio']:.3f}")
 
     for kw, titulo in ((dict(N_Ed_kN=-300.0, My_Ed_kNm=180.0, chi_y=0.8, chi_LT=0.85), "tracción"),
                        (dict(N_Ed_kN=250.0, My_Ed_kNm=180.0, chi_y=None, chi_LT=0.85), "χ_y ausente")):

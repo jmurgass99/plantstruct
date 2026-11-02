@@ -9,4 +9,6 @@ W_t (manto + techo) = 755 kN → w_t = 12.0 kN/m
      0.40   0.188       46.6      79,952  3.461  mechanically-anchored    15,293         81
 
 Con A_i >= 0,15 g el tanque ya necesita anclaje mecánico; entre 0,05 y 0,10 g es autoanclado con levantamiento y hay que comprobar L y t_a (§E.6.2.1.1.2).
+  A_i = 0.05 g: L = 0,01723·t_a·√(F_y/(H·G_e)) = 0.565 m (a mano 0.565); límite 0,035·D = 0.70 m → dentro
+  A_i = 0.10 g: L = 0,01723·t_a·√(F_y/(H·G_e)) = 0.568 m (a mano 0.568); límite 0,035·D = 0.70 m → dentro
 F_p = 4·M_rw/D − W_t·(1 − 0,4·A_v) es el levantamiento total para anclaje mecánico (§E.6.2.1.2); el número de pernos usa φ·A_b·F_y.

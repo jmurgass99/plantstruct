@@ -9,4 +9,12 @@ Llave de cortante: requerida = False (fricción 160 kN frente a V = 80 kN)
 Estado: VERIFICADO, cumple = False
 
 N_b(f'c = 25 MPa, h_ef = 300 mm) = 259.81 kN (k_c = 10 SI; con el 24 de libras-pulgada saldría 2,4 veces más)
-Los φ (0,75 acero, 0,70 hormigón) son entrada fija del módulo sin armadura suplementaria; §17.7 (cortante en anclajes) no se comprueba: el cortante va a fricción y llave.
+Los φ (0,75 acero, 0,70 hormigón) son entrada fija del módulo sin armadura suplementaria.
+
+Acero del perno §17.6.1.2 con A_se,N = 353 mm² (M24) y f_uta = 620 MPa: N_sa = 437.7 kN (a mano 2·353·620 = 437.7) frente a 380.0 kN por fluencia sobre el área bruta
+Cortante en anclajes §17.7 si el cortante lo toman los 4 pernos (sin fricción ni llave), V = 80 kN:
+  acero φV_sa                        341.4 kN
+  rotura de borde φV_cb               31.8 kN
+  arrancamiento por palanca φV_cp   2928.0 kN
+  utilización a cortante 2.52; interacción §17.8 (exponente 5/3) 29.49 → is_ok = False
+  V_cp usa N_cp = n·N_b = 4·522.9 = 2091 kN, sin solape de conos ni bordes: 15 veces el cono de grupo de tracción del propio módulo (138.6 kN, 2 pernos). φV_cp queda muy del lado inseguro; aquí gobierna la rotura de borde.

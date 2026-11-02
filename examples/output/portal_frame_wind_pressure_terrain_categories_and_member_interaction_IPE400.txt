@@ -15,6 +15,12 @@ IPE 400 S275, N_Ed = 250 kN, M_y,Ed = 180 kN·m, χ_y = 0,80, χ_LT = 0,85:
   status                           CUMPLE
   k_y_basis: EN 1993-1-1 Anexo B, Tabla B.1 (Metodo 2, clases 1-2) SIMPLIFICADA: k_y = min(1 + 0.6*n, 1.4), equivalente a C_my = 1.0 …
 
+k_yy con la fórmula de la Tabla B.1 (pasando λ̄_y; C_my = 1) frente a la histórica:
+  λ̄_y = 0.5: k_yy = 1.040 (a mano 1 + min(λ̄_y − 0,2; 0,8)·n_y = 1.040), ratio 0.828 frente a 0.854
+  λ̄_y = 0.8: k_yy = 1.081 (a mano 1 + min(λ̄_y − 0,2; 0,8)·n_y = 1.081), ratio 0.854 frente a 0.854
+  λ̄_y = 1.2: k_yy = 1.108 (a mano 1 + min(λ̄_y − 0,2; 0,8)·n_y = 1.108), ratio 0.872 frente a 0.854
+  λ̄_y = 1.6: k_yy = 1.108 (a mano 1 + min(λ̄_y − 0,2; 0,8)·n_y = 1.108), ratio 0.872 frente a 0.854
+
 tracción: ValueError → check_steel_member_interaction: N_Ed_kN=-300 kN es TRACCIÓN, y EN 1993-1-1 §6.3.3 cubre 'members in bending an…
 
 χ_y ausente: ValueError → check_steel_member_interaction: chi_y debe proporcionarse explícitamente. No se asumen factores de reducción p…

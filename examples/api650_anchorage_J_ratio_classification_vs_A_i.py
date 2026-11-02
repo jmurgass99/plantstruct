@@ -20,6 +20,7 @@ from plantstruct.tanks import (
     estimate_shell_and_roof_weight_kN,
     housner_masses,
 )
+from plantstruct.tanks.anchorage import self_anchored_uplift_length_api650
 
 D, H, T_U, H_SHELL = 20.0, 15.0, 8.0, 16.0
 
@@ -38,6 +39,12 @@ def main() -> None:
                                               bolt_diameter_mm=36.0, bolt_Fy_MPa=250.0))
         print(f"  {A_i:7.2f} {A_v:7.3f} {w_a:10.1f} {m.M_overturn_kNm:11,.0f} {r.J:6.3f} {r.anchorage_type:>22} {r.Fp_kN:9,.0f} {r.N_bolts_required:10d}")
     print("\nCon A_i >= 0,15 g el tanque ya necesita anclaje mecánico; entre 0,05 y 0,10 g es autoanclado con levantamiento y hay que comprobar L y t_a (§E.6.2.1.1.2).")
+    for A_i in (0.05, 0.10):
+        G_e = 1.0 - 0.4 * 0.47 * A_i
+        L = self_anchored_uplift_length_api650(T_U, 250.0, H, G_e, D)
+        print(f"  A_i = {A_i:.2f} g: L = 0,01723·t_a·√(F_y/(H·G_e)) = {L['L_uplift_m']:.3f} m "
+              f"(a mano {0.01723 * T_U * (250.0 / (H * G_e)) ** 0.5:.3f}); límite 0,035·D = {L['L_max_0035D_m']:.2f} m → "
+              f"{'dentro' if L['within_0035D_limit'] else 'FUERA: hace falta engrosar el anillo'}")
     print("F_p = 4·M_rw/D − W_t·(1 − 0,4·A_v) es el levantamiento total para anclaje mecánico (§E.6.2.1.2); el número de pernos usa φ·A_b·F_y.")
 
 
