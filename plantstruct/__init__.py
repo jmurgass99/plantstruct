@@ -1,4 +1,4 @@
-__version__ = "0.2.0"
+__version__ = "0.2.1"
 
 from .tanks import shell_thickness_one_foot, hoop_tension  # noqa: F401
 

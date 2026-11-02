@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "plantstruct"
-version = "0.2.0"
+version = "0.2.1"
 description = "Industrial plant structures: API 650 tanks (one-foot shell courses, hoop tension, shell buckling, external pressure, Annex E Housner masses with impulsive/convective periods, SRSS shear and moment, anchorage ratio J, bolts, full memo, stick model for SAP2000, ASCE 7-22 15.7), EN 1991-4 silos (Janssen, slenderness, discharge, patch load, EN 1993-1-6 buckling), chimneys, LPG spheres, pipe racks, portal frames, blast walls, column bases with ACI 318-19 ch. 17 anchors and composite mezzanine beams (AISC 360, EN 1994)."
 readme = "README.md"
 requires-python = ">=3.11"

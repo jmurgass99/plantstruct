@@ -55,6 +55,7 @@ ALCANCE DECLARADO (lo que NO se implementa)
 from __future__ import annotations
 
 from dataclasses import dataclass
+import math
 from math import pi, sqrt
 
 
@@ -759,11 +760,25 @@ def check_anchor_shear_aci318_17_7(
     Ase_V_mm2: float | None = None,
     Tu_kN: float = 0.0,
     phi_Nn_kN: float | None = None,
+    s_anchor_mm: float | None = None,
+    fya_MPa: float | None = None,
+    cast_in: bool = True,
 ) -> dict:
+    """Cortante en anclajes según ACI 318-19 §17.7 e interacción de §17.8 (exponente 5/3).
+
+    Arrancamiento por palanca (§17.7.3): V_cpg = k_cp·N_cpg con N_cpg = N_cbg, el cono de
+    tracción del GRUPO de §17.6.2 (A_Nc/A_Nco·ψ_ed,N·ψ_c,N·N_b), no la suma n·N_b.
+    Geometría del cono (hipótesis declarada): los ``n_anchors`` forman una malla de
+    ⌈√n⌉ × ⌈n/⌈√n⌉⌉ con separación uniforme ``s_anchor_mm``; ``ca1_mm`` y ``ca2_mm``
+    (o 1,5·h_ef si es None) son las distancias a los bordes de los lados del grupo y el
+    lado opuesto a ``ca1`` se toma libre (1,5·h_ef). Sin ``s_anchor_mm`` se usa el área de
+    un solo anclaje, la cota inferior. ``f_uta`` se limita a min(1,9·f_ya, 860 MPa)
+    (§17.7.1.2) si se da ``fya_MPa``; si no, solo a 860 MPa.
+    """
     phi_v_steel = 0.65
     phi_v_conc = 0.70
     ase_v = Ase_V_mm2 if Ase_V_mm2 is not None else 0.785 * (pi * db_anchor_mm ** 2 / 4.0)
-    futa_eff = min(futa_MPa, 860.0)
+    futa_eff = min(futa_MPa, 860.0, 1.9 * fya_MPa) if fya_MPa is not None else min(futa_MPa, 860.0)
     Vsa_kN = n_anchors * 0.60 * ase_v * futa_eff / 1000.0
     Vsa_design_kN = phi_v_steel * Vsa_kN
 
@@ -782,8 +797,21 @@ def check_anchor_shear_aci318_17_7(
     Vcb_design_kN = phi_v_conc * Vcb_kN
 
     k_cp = 1.0 if hef_mm < 65.0 else 2.0
-    Ncp_kN = n_anchors * Nb_kN(fc_MPa, hef_mm, cast_in=True, lambda_a=lambda_a)
-    Vcp_kN = k_cp * Ncp_kN
+    lim = 1.5 * hef_mm
+    n_x = max(1, math.ceil(math.sqrt(n_anchors)))
+    n_y = max(1, math.ceil(n_anchors / n_x))
+    if s_anchor_mm is None:
+        n_x = n_y = 1                                   # cota inferior: un solo cono
+    s_eff = min(s_anchor_mm, 3.0 * hef_mm) if s_anchor_mm is not None else 0.0
+    c1 = min(ca1_mm, lim)
+    c2 = min(ca2_mm, lim) if ca2_mm is not None else lim
+    W1 = c1 + (n_y - 1) * s_eff + lim                    # perpendicular al borde ca1
+    W2 = c2 + (n_x - 1) * s_eff + c2                      # a lo largo del borde
+    ANc = min(W1 * W2, n_anchors * ANco_mm2(hef_mm))
+    psi_ed_n = psi_ed_N(min(ca1_mm, ca2_mm) if ca2_mm is not None else ca1_mm, hef_mm)
+    psi_c_n = 1.0 if cracked_concrete else (PSI_C_N_UNCRACKED_CAST_IN if cast_in else 1.0)
+    Ncpg_kN = (ANc / ANco_mm2(hef_mm)) * psi_ed_n * psi_c_n * Nb_kN(fc_MPa, hef_mm, cast_in=cast_in, lambda_a=lambda_a)
+    Vcp_kN = k_cp * Ncpg_kN
     Vcp_design_kN = phi_v_conc * Vcp_kN
 
     phi_Vn_kN = min(Vsa_design_kN, Vcb_design_kN, Vcp_design_kN)
@@ -801,6 +829,8 @@ def check_anchor_shear_aci318_17_7(
         "Vcb_design_kN": Vcb_design_kN,
         "Vcp_kN": Vcp_kN,
         "Vcp_design_kN": Vcp_design_kN,
+        "Ncpg_kN": Ncpg_kN,
+        "ANc_pryout_mm2": ANc,
         "governing_shear_design_kN": phi_Vn_kN,
         "shear_utilization": v_ratio,
         "interaction_ratio_17_8": inter_17_8,

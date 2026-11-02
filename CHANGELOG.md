@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.1 — 2026-11-02
+
+- `bases_columna.check_anchor_shear_aci318_17_7` (añadida en 1cc2f67): el arrancamiento por palanca de §17.7.3 tomaba N_cp = n·N_b, sin solape de conos ni bordes. En el caso de la placa con gran excentricidad (4 × M24, h_ef = 450 mm, s = 200 mm) daba φV_cp = 2928 kN, 12 veces el valor con el cono de grupo. Ahora N_cpg = N_cbg de §17.6.2 (A_Nc/A_Nco·ψ_ed,N·ψ_c,N·N_b) con la malla declarada en el docstring; sin `s_anchor_mm` usa un solo cono (cota inferior). Se añaden `s_anchor_mm`, `fya_MPa` (f_uta ≤ 1,9·f_ya) y `cast_in` (`tests/test_anchor_pryout_group_cone.py`).
+
 ## 0.2.0 — 2026-11-01
 
 Correcciones encontradas al ejecutar los casos de uso del README.
