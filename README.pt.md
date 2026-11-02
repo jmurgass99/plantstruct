@@ -25,7 +25,7 @@ As estruturas de instalações industriais (reservatórios, silos, racks, chamin
 - reservatórios com mais de 60 m (método do ponto de cálculo variável, API 650 §5.6.4), tetos flutuantes, fundos e fundações de reservatórios;
 - silos com tremonha (pressões na tremonha, §6), descarga excêntrica detalhada (§5.2.4.3) ou silos de betão;
 - amplitude de vibração por vórtices (número de Scruton, EN 1991-1-4 eq. E.7): `chimneys` só dá a condição de ressonância e está marcado como experimental;
-- esforço transverso nos chumbadouros (ACI 318-19 §17.7) dentro de `disenar_base`: leva o esforço transverso ao atrito e à chave; `check_anchor_shear_aci318_17_7` existe à parte, mas o seu arrancamento por alavanca fica do lado inseguro;
+- esforço transverso nos chumbadouros (ACI 318-19 §17.7) dentro de `disenar_base`: leva o esforço transverso ao atrito e à chave; `check_anchor_shear_aci318_17_7` existe à parte e tem de ser chamada à mão;
 - esforços no invólucro de esferas por sismo ou vento: `esferas_gpl` é espessura por pressão e repartição pelos pilares.
 
 ## Instalação
@@ -35,7 +35,7 @@ pip install git+https://github.com/jmurgass99/plantstruct.git
 pip install "plantstruct[api] @ git+https://github.com/jmurgass99/plantstruct.git"   # API REST com FastAPI
 ```
 
-Para desenvolvimento: `git clone`, `pip install -e ".[test,api]"`, `pytest -q` (27 ficheiros de testes). No Windows, se a consola não for UTF-8, execute os exemplos com `python -X utf8 examples/<nome>.py`.
+Para desenvolvimento: `git clone`, `pip install -e ".[test,api]"`, `pytest -q` (28 ficheiros de testes). No Windows, se a consola não for UTF-8, execute os exemplos com `python -X utf8 examples/<nome>.py`.
 
 ## Capacidades
 
@@ -635,9 +635,9 @@ Acero del perno §17.6.1.2 con A_se,N = 353 mm² (M24) y f_uta = 620 MPa: N_sa =
 Cortante en anclajes §17.7 si el cortante lo toman los 4 pernos (sin fricción ni llave), V = 80 kN:
   acero φV_sa                        341.4 kN
   rotura de borde φV_cb               31.8 kN
-  arrancamiento por palanca φV_cp   2928.0 kN
+  arrancamiento por palanca φV_cp    238.4 kN
   utilización a cortante 2.52; interacción §17.8 (exponente 5/3) 29.49 → is_ok = False
-  V_cp usa N_cp = n·N_b = 4·522.9 = 2091 kN, sin solape de conos ni bordes: 15 veces el cono de grupo de tracción del propio módulo (138.6 kN, 2 pernos). φV_cp queda muy del lado inseguro; aquí gobierna la rotura de borde.
+  V_cp = k_cp·N_cbg del grupo 2 × 2 (s = 200 mm): A_Nc = 752,500 mm², N_cbg = 170.3 kN (la suma 4·N_b daría 2091 kN, sin solape de conos ni bordes). Gobierna la rotura de borde.
 ```
 
 </details>
@@ -846,7 +846,7 @@ D = 0 en full-design → 422 (validación Pydantic)
 - `asce7_15_7` toma T_i = 0 se não se der a espessura e não avalia S_ai acima de T_L; os fatores R são dados.
 - `chimneys`, `esferas_gpl` e `pipe_rack` são pré-dimensionamento com coeficientes sísmicos de triagem (C_s fixo por norma), sem espectro.
 - `portal_frame.check_steel_member_interaction` usa por defeito k_y = min(1 + 0,6·n, 1,4), equivalente à Tabela B.1 com C_my = 1 e λ̄_y = 0,8 fixos (subestima k_yy em pilares mais esbeltos e declara-o em `k_y_basis`); com `lambda_y` (e `C_my`) aplica a Tabela B.1, Método 2, Classes 1-2.
-- `bases_columna`: por defeito a capacidade do aço do chumbadouro é cedência sobre a área bruta; com `futa_MPa` e `Ase_N_mm2` usa A_se·f_uta do §17.6.1.2. A chave de corte tem altura e espessura fixas; com P ≤ 0 não se deriva a exigência de tração. `check_anchor_shear_aci318_17_7` (§17.7 e interação 5/3 do §17.8) não é chamada por `disenar_base` e simplifica: V_cp = k_cp·n·N_b sem sobreposição de cones nem bordos (muito do lado inseguro, ver o caso de placa com grande excentricidade), A_Vc sem o afastamento entre chumbadouros, sem ψ_h,V e f_uta só limitada a 860 MPa.
+- `bases_columna`: por defeito a capacidade do aço do chumbadouro é cedência sobre a área bruta; com `futa_MPa` e `Ase_N_mm2` usa A_se·f_uta do §17.6.1.2. A chave de corte tem altura e espessura fixas; com P ≤ 0 não se deriva a exigência de tração. `check_anchor_shear_aci318_17_7` (§17.7 e interação 5/3 do §17.8) não é chamada por `disenar_base` e simplifica: o cone de V_cp (N_cbg do §17.6.2) supõe uma malha ⌈√n⌉ × ⌈n/⌈√n⌉⌉ com afastamento `s_anchor_mm` e o lado oposto a c_a1 livre (sem `s_anchor_mm`, um só cone: limite inferior); A_Vc não inclui o afastamento entre chumbadouros e não há ψ_h,V. Até 0c7e004 V_cp usava n·N_b (12 vezes mais no caso da placa).
 - `anchor_codes` cobre apenas o cone de uma ancoragem sem bordos multiplicado pelo número de ancoragens.
 - As vigas mistas supõem vão simples, carga uniforme mais uma pontual a meio vão, chapa perpendicular com uma linha de conectores; a flecha com conexão parcial usa a aproximação da AISC I3.2 também no ramo EN 1994.
 - `report_api650` é um esqueleto de secções do Anexo E, não um relatório calculado: a memória calculada é `memos.render_tank_memo`.

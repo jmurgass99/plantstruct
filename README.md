@@ -25,7 +25,7 @@ Las estructuras de planta (tanques, silos, racks, chimeneas, bases de equipos) s
 - tanques de más de 60 m (método del punto de diseño variable, API 650 §5.6.4), techos flotantes, fondos y cimentaciones de tanque;
 - silos con tolva (presiones de la tolva, §6), descarga excéntrica detallada (§5.2.4.3) o silos de hormigón;
 - amplitud de vibración por vórtices (número de Scruton, EN 1991-1-4 ec. E.7): `chimneys` solo da la condición de resonancia y está marcado experimental;
-- cortante en pernos de anclaje (ACI 318-19 §17.7) dentro de `disenar_base`: lleva el cortante a fricción y llave; `check_anchor_shear_aci318_17_7` existe aparte pero su arrancamiento por palanca queda del lado inseguro;
+- cortante en pernos de anclaje (ACI 318-19 §17.7) dentro de `disenar_base`: lleva el cortante a fricción y llave; `check_anchor_shear_aci318_17_7` existe aparte y hay que llamarla a mano;
 - esfuerzos en el casco de esferas por sismo o viento: `esferas_gpl` es espesor por presión y reparto a columnas.
 
 ## Instalación
@@ -35,7 +35,7 @@ pip install git+https://github.com/jmurgass99/plantstruct.git
 pip install "plantstruct[api] @ git+https://github.com/jmurgass99/plantstruct.git"   # API REST con FastAPI
 ```
 
-Para desarrollo: `git clone`, `pip install -e ".[test,api]"`, `pytest -q` (27 ficheros de tests). En Windows, si la consola no es UTF-8, ejecuta los ejemplos con `python -X utf8 examples/<nombre>.py`.
+Para desarrollo: `git clone`, `pip install -e ".[test,api]"`, `pytest -q` (28 ficheros de tests). En Windows, si la consola no es UTF-8, ejecuta los ejemplos con `python -X utf8 examples/<nombre>.py`.
 
 ## Capacidades
 
@@ -633,9 +633,9 @@ Acero del perno §17.6.1.2 con A_se,N = 353 mm² (M24) y f_uta = 620 MPa: N_sa =
 Cortante en anclajes §17.7 si el cortante lo toman los 4 pernos (sin fricción ni llave), V = 80 kN:
   acero φV_sa                        341.4 kN
   rotura de borde φV_cb               31.8 kN
-  arrancamiento por palanca φV_cp   2928.0 kN
+  arrancamiento por palanca φV_cp    238.4 kN
   utilización a cortante 2.52; interacción §17.8 (exponente 5/3) 29.49 → is_ok = False
-  V_cp usa N_cp = n·N_b = 4·522.9 = 2091 kN, sin solape de conos ni bordes: 15 veces el cono de grupo de tracción del propio módulo (138.6 kN, 2 pernos). φV_cp queda muy del lado inseguro; aquí gobierna la rotura de borde.
+  V_cp = k_cp·N_cbg del grupo 2 × 2 (s = 200 mm): A_Nc = 752,500 mm², N_cbg = 170.3 kN (la suma 4·N_b daría 2091 kN, sin solape de conos ni bordes). Gobierna la rotura de borde.
 ```
 
 </details>
@@ -844,7 +844,7 @@ D = 0 en full-design → 422 (validación Pydantic)
 - `asce7_15_7` toma T_i = 0 si no se da el espesor y no evalúa S_ai por encima de T_L; los factores R son entrada.
 - `chimneys`, `esferas_gpl` y `pipe_rack` son predimensionamiento con coeficientes sísmicos de criba (C_s fijo por código), sin espectro.
 - `portal_frame.check_steel_member_interaction` usa por defecto k_y = min(1 + 0,6·n, 1,4), equivalente a la Tabla B.1 con C_my = 1 y λ̄_y = 0,8 fijos (subestima k_yy en pilares más esbeltos y lo declara en `k_y_basis`); con `lambda_y` (y `C_my`) aplica la Tabla B.1, Método 2, Clases 1-2.
-- `bases_columna`: por defecto la capacidad del acero del perno es fluencia sobre área bruta; con `futa_MPa` y `Ase_N_mm2` usa A_se·f_uta de §17.6.1.2. La llave de cortante tiene altura y espesor fijos; con P ≤ 0 no se deriva la demanda de tracción. `check_anchor_shear_aci318_17_7` (§17.7 e interacción 5/3 de §17.8) no lo llama `disenar_base` y simplifica: V_cp = k_cp·n·N_b sin solape de conos ni bordes (muy del lado inseguro, ver el caso de placa con gran excentricidad), A_Vc sin la separación entre anclajes, sin ψ_h,V y f_uta solo limitada a 860 MPa.
+- `bases_columna`: por defecto la capacidad del acero del perno es fluencia sobre área bruta; con `futa_MPa` y `Ase_N_mm2` usa A_se·f_uta de §17.6.1.2. La llave de cortante tiene altura y espesor fijos; con P ≤ 0 no se deriva la demanda de tracción. `check_anchor_shear_aci318_17_7` (§17.7 e interacción 5/3 de §17.8) no lo llama `disenar_base` y simplifica: el cono de V_cp (N_cbg de §17.6.2) supone una malla ⌈√n⌉ × ⌈n/⌈√n⌉⌉ con separación `s_anchor_mm` y el lado opuesto a c_a1 libre (sin `s_anchor_mm`, un solo cono: cota inferior); A_Vc no incluye la separación entre anclajes y no hay ψ_h,V. Hasta 0c7e004 V_cp usaba n·N_b (12 veces más en el caso de placa).
 - `anchor_codes` cubre solo el cono de un anclaje sin bordes multiplicado por el número de anclajes.
 - Las vigas mixtas suponen vano simple, carga uniforme más una puntual en el centro, chapa perpendicular con una línea de pernos; la flecha con conexión parcial usa la aproximación de AISC I3.2 también en la rama EN 1994.
 - `report_api650` es un esqueleto de secciones del Anexo E, no un informe calculado: la memoria calculada es `memos.render_tank_memo`.

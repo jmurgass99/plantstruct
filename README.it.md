@@ -25,7 +25,7 @@ Le strutture degli impianti (serbatoi, silos, rack, ciminiere, basamenti di appa
 - serbatoi oltre i 60 m (metodo del punto di progetto variabile, API 650 §5.6.4), tetti galleggianti, fondi e fondazioni dei serbatoi;
 - silos con tramoggia (pressioni nella tramoggia, §6), scarico eccentrico dettagliato (§5.2.4.3) o silos in calcestruzzo;
 - ampiezza della vibrazione da vortici (numero di Scruton, EN 1991-1-4 eq. E.7): `chimneys` dà solo la condizione di risonanza ed è marcato sperimentale;
-- taglio sui tirafondi (ACI 318-19 §17.7) dentro `disenar_base`: porta il taglio ad attrito e tacco; `check_anchor_shear_aci318_17_7` esiste a parte ma il suo pryout è a sfavore di sicurezza;
+- taglio sui tirafondi (ACI 318-19 §17.7) dentro `disenar_base`: porta il taglio ad attrito e tacco; `check_anchor_shear_aci318_17_7` esiste a parte e va chiamata a mano;
 - sollecitazioni nel guscio delle sfere per sisma o vento: `esferas_gpl` copre lo spessore per pressione e la ripartizione alle colonne.
 
 ## Installazione
@@ -35,7 +35,7 @@ pip install git+https://github.com/jmurgass99/plantstruct.git
 pip install "plantstruct[api] @ git+https://github.com/jmurgass99/plantstruct.git"   # API REST con FastAPI
 ```
 
-Per lo sviluppo: `git clone`, `pip install -e ".[test,api]"`, `pytest -q` (27 file di test). Su Windows, se la console non è UTF-8, esegui gli esempi con `python -X utf8 examples/<nome>.py`.
+Per lo sviluppo: `git clone`, `pip install -e ".[test,api]"`, `pytest -q` (28 file di test). Su Windows, se la console non è UTF-8, esegui gli esempi con `python -X utf8 examples/<nome>.py`.
 
 ## Funzionalità
 
@@ -635,9 +635,9 @@ Acero del perno §17.6.1.2 con A_se,N = 353 mm² (M24) y f_uta = 620 MPa: N_sa =
 Cortante en anclajes §17.7 si el cortante lo toman los 4 pernos (sin fricción ni llave), V = 80 kN:
   acero φV_sa                        341.4 kN
   rotura de borde φV_cb               31.8 kN
-  arrancamiento por palanca φV_cp   2928.0 kN
+  arrancamiento por palanca φV_cp    238.4 kN
   utilización a cortante 2.52; interacción §17.8 (exponente 5/3) 29.49 → is_ok = False
-  V_cp usa N_cp = n·N_b = 4·522.9 = 2091 kN, sin solape de conos ni bordes: 15 veces el cono de grupo de tracción del propio módulo (138.6 kN, 2 pernos). φV_cp queda muy del lado inseguro; aquí gobierna la rotura de borde.
+  V_cp = k_cp·N_cbg del grupo 2 × 2 (s = 200 mm): A_Nc = 752,500 mm², N_cbg = 170.3 kN (la suma 4·N_b daría 2091 kN, sin solape de conos ni bordes). Gobierna la rotura de borde.
 ```
 
 </details>
@@ -846,7 +846,7 @@ D = 0 en full-design → 422 (validación Pydantic)
 - `asce7_15_7` assume T_i = 0 se non si fornisce lo spessore e non valuta S_ai oltre T_L; i fattori R sono dati in ingresso.
 - `chimneys`, `esferas_gpl` e `pipe_rack` sono predimensionamento con coefficienti sismici di screening (C_s fisso per norma), senza spettro.
 - `portal_frame.check_steel_member_interaction` usa per impostazione predefinita k_y = min(1 + 0,6·n, 1,4), equivalente alla Tabella B.1 con C_my = 1 e λ̄_y = 0,8 fissi (sottostima k_yy per colonne più snelle e lo dichiara in `k_y_basis`); con `lambda_y` (e `C_my`) applica la Tabella B.1, Metodo 2, Classi 1-2.
-- `bases_columna`: per impostazione predefinita la capacità dell'acciaio del tirafondo è lo snervamento sull'area lorda; con `futa_MPa` e `Ase_N_mm2` usa A_se·f_uta del §17.6.1.2. Il tacco a taglio ha altezza e spessore fissi; con P ≤ 0 non si ricava la domanda di trazione. `check_anchor_shear_aci318_17_7` (§17.7 e interazione 5/3 del §17.8) non è chiamata da `disenar_base` e semplifica: V_cp = k_cp·n·N_b senza sovrapposizione dei coni né bordi (molto a sfavore di sicurezza, vedi il caso della piastra con grande eccentricità), A_Vc senza l'interasse tra i tirafondi, senza ψ_h,V e f_uta limitata solo a 860 MPa.
+- `bases_columna`: per impostazione predefinita la capacità dell'acciaio del tirafondo è lo snervamento sull'area lorda; con `futa_MPa` e `Ase_N_mm2` usa A_se·f_uta del §17.6.1.2. Il tacco a taglio ha altezza e spessore fissi; con P ≤ 0 non si ricava la domanda di trazione. `check_anchor_shear_aci318_17_7` (§17.7 e interazione 5/3 del §17.8) non è chiamata da `disenar_base` e semplifica: il cono di V_cp (N_cbg del §17.6.2) presuppone una griglia ⌈√n⌉ × ⌈n/⌈√n⌉⌉ con interasse `s_anchor_mm` e il lato opposto a c_a1 libero (senza `s_anchor_mm`, un solo cono: limite inferiore); A_Vc non include l'interasse tra i tirafondi e non c'è ψ_h,V. Fino a 0c7e004 V_cp usava n·N_b (12 volte di più nel caso della piastra).
 - `anchor_codes` copre solo il cono di un ancoraggio senza bordi moltiplicato per il numero di ancoraggi.
 - Le travi composte presuppongono campata semplice, carico uniforme più un concentrato in mezzeria, lamiera perpendicolare con una fila di connettori; la freccia con connessione parziale usa l'approssimazione della AISC I3.2 anche nel ramo EN 1994.
 - `report_api650` è uno scheletro delle sezioni dell'Allegato E, non una relazione calcolata: la relazione calcolata è `memos.render_tank_memo`.

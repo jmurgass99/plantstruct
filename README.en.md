@@ -25,7 +25,7 @@ Plant structures (tanks, silos, racks, chimneys, equipment bases) are designed w
 - tanks larger than 60 m (variable-design-point method, API 650 §5.6.4), floating roofs, tank bottoms and foundations;
 - silos with hoppers (hopper pressures, §6), detailed eccentric discharge (§5.2.4.3) or concrete silos;
 - vortex-induced vibration amplitude (Scruton number, EN 1991-1-4 eq. E.7): `chimneys` gives only the resonance condition and is marked experimental;
-- shear on anchor bolts (ACI 318-19 §17.7) inside `disenar_base`: it sends shear to friction and the lug; `check_anchor_shear_aci318_17_7` exists separately but its pryout is on the unsafe side;
+- shear on anchor bolts (ACI 318-19 §17.7) inside `disenar_base`: it sends shear to friction and the lug; `check_anchor_shear_aci318_17_7` exists separately and has to be called by hand;
 - shell stresses in spheres from earthquake or wind: `esferas_gpl` covers pressure thickness and distribution to columns.
 
 ## Installation
@@ -35,7 +35,7 @@ pip install git+https://github.com/jmurgass99/plantstruct.git
 pip install "plantstruct[api] @ git+https://github.com/jmurgass99/plantstruct.git"   # REST API with FastAPI
 ```
 
-For development: `git clone`, `pip install -e ".[test,api]"`, `pytest -q` (27 test files). On Windows, if the console is not UTF-8, run the examples with `python -X utf8 examples/<name>.py`.
+For development: `git clone`, `pip install -e ".[test,api]"`, `pytest -q` (28 test files). On Windows, if the console is not UTF-8, run the examples with `python -X utf8 examples/<name>.py`.
 
 ## Capabilities
 
@@ -635,9 +635,9 @@ Acero del perno §17.6.1.2 con A_se,N = 353 mm² (M24) y f_uta = 620 MPa: N_sa =
 Cortante en anclajes §17.7 si el cortante lo toman los 4 pernos (sin fricción ni llave), V = 80 kN:
   acero φV_sa                        341.4 kN
   rotura de borde φV_cb               31.8 kN
-  arrancamiento por palanca φV_cp   2928.0 kN
+  arrancamiento por palanca φV_cp    238.4 kN
   utilización a cortante 2.52; interacción §17.8 (exponente 5/3) 29.49 → is_ok = False
-  V_cp usa N_cp = n·N_b = 4·522.9 = 2091 kN, sin solape de conos ni bordes: 15 veces el cono de grupo de tracción del propio módulo (138.6 kN, 2 pernos). φV_cp queda muy del lado inseguro; aquí gobierna la rotura de borde.
+  V_cp = k_cp·N_cbg del grupo 2 × 2 (s = 200 mm): A_Nc = 752,500 mm², N_cbg = 170.3 kN (la suma 4·N_b daría 2091 kN, sin solape de conos ni bordes). Gobierna la rotura de borde.
 ```
 
 </details>
@@ -846,7 +846,7 @@ D = 0 en full-design → 422 (validación Pydantic)
 - `asce7_15_7` takes T_i = 0 if the thickness is not given and does not evaluate S_ai above T_L; the R factors are inputs.
 - `chimneys`, `esferas_gpl` and `pipe_rack` are pre-sizing with screening seismic coefficients (fixed C_s by code), without a spectrum.
 - `portal_frame.check_steel_member_interaction` uses k_y = min(1 + 0.6·n, 1.4) by default, equivalent to Table B.1 with fixed C_my = 1 and λ̄_y = 0.8 (it underestimates k_yy for more slender columns and says so in `k_y_basis`); with `lambda_y` (and `C_my`) it applies Table B.1, Method 2, Classes 1-2.
-- `bases_columna`: by default the steel capacity of the bolt is yielding on the gross area; with `futa_MPa` and `Ase_N_mm2` it uses A_se·f_uta of §17.6.1.2. The shear lug has fixed height and thickness; with P ≤ 0 the tension demand is not derived. `check_anchor_shear_aci318_17_7` (§17.7 and the 5/3 interaction of §17.8) is not called by `disenar_base` and simplifies: V_cp = k_cp·n·N_b with no cone overlap or edges (far on the unsafe side, see the large-eccentricity base plate case), A_Vc without the anchor spacing, no ψ_h,V, and f_uta only capped at 860 MPa.
+- `bases_columna`: by default the steel capacity of the bolt is yielding on the gross area; with `futa_MPa` and `Ase_N_mm2` it uses A_se·f_uta of §17.6.1.2. The shear lug has fixed height and thickness; with P ≤ 0 the tension demand is not derived. `check_anchor_shear_aci318_17_7` (§17.7 and the 5/3 interaction of §17.8) is not called by `disenar_base` and simplifies: the V_cp cone (N_cbg of §17.6.2) assumes a ⌈√n⌉ × ⌈n/⌈√n⌉⌉ grid with spacing `s_anchor_mm` and the side opposite c_a1 free (without `s_anchor_mm`, a single cone: lower bound); A_Vc does not include the anchor spacing and there is no ψ_h,V. Up to 0c7e004 V_cp used n·N_b (12 times more in the base plate case).
 - `anchor_codes` covers only the cone of a single anchor without edges multiplied by the number of anchors.
 - The composite beams assume a simple span, uniform load plus a midspan point load, perpendicular deck with one line of studs; the partial-interaction deflection uses the AISC I3.2 approximation also in the EN 1994 branch.
 - `report_api650` is a skeleton of Annex E sections, not a computed report: the computed report is `memos.render_tank_memo`.

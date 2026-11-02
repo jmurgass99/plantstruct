@@ -40,15 +40,13 @@ def main() -> None:
           f"(a mano 2·353·620 = {2 * 353 * 620 / 1000:.1f}) frente a {a.steel_capacity_kN:.1f} kN por fluencia sobre el área bruta")
     v = check_anchor_shear_aci318_17_7(Vu_kN=80.0, n_anchors=4, db_anchor_mm=24.0, futa_MPa=620.0, fc_MPa=30.0, hef_mm=450.0,
                                        ca1_mm=200.0, ca2_mm=250.0, Ase_V_mm2=353.0, Tu_kN=r2.Tu_anchor_kN,
-                                       phi_Nn_kN=r2.anchor_tension.governing_capacity_kN)
+                                       phi_Nn_kN=r2.anchor_tension.governing_capacity_kN, s_anchor_mm=200.0, fya_MPa=420.0)
     print("Cortante en anclajes §17.7 si el cortante lo toman los 4 pernos (sin fricción ni llave), V = 80 kN:")
     for k, lbl in (("Vsa_design_kN", "acero φV_sa"), ("Vcb_design_kN", "rotura de borde φV_cb"), ("Vcp_design_kN", "arrancamiento por palanca φV_cp")):
         print(f"  {lbl:31} {v[k]:8.1f} kN")
     print(f"  utilización a cortante {v['shear_utilization']:.2f}; interacción §17.8 (exponente 5/3) {v['interaction_ratio_17_8']:.2f} → is_ok = {v['is_ok']}")
-    ncp = 4 * Nb_kN(30.0, 450.0)
-    print(f"  V_cp usa N_cp = n·N_b = 4·{Nb_kN(30.0, 450.0):.1f} = {ncp:.0f} kN, sin solape de conos ni bordes: "
-          f"{ncp / a.concrete_breakout_kN:.0f} veces el cono de grupo de tracción del propio módulo ({a.concrete_breakout_kN:.1f} kN, 2 pernos). "
-          "φV_cp queda muy del lado inseguro; aquí gobierna la rotura de borde.")
+    print(f"  V_cp = k_cp·N_cbg del grupo 2 × 2 (s = 200 mm): A_Nc = {v['ANc_pryout_mm2']:,.0f} mm², N_cbg = {v['Ncpg_kN']:.1f} kN "
+          f"(la suma 4·N_b daría {4 * Nb_kN(30.0, 450.0):.0f} kN, sin solape de conos ni bordes). Gobierna la rotura de borde.")
 
 
 if __name__ == "__main__":
