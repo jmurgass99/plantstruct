@@ -159,8 +159,6 @@ def ANco_mm2(hef_mm: float) -> float:
 
 def Nb_kN(fc_MPa: float, hef_mm: float, cast_in: bool = True,
           lambda_a: float = 1.0) -> float:
-    futa_MPa: float | None = None
-    Ase_N_mm2: float | None = None
     """ACI 318-19 §17.6.2.2.1: resistencia basica al arrancamiento del cono.
 
         N_b = k_c * lambda_a * sqrt(f'c) * h_ef^1.5      [N, mm, MPa]

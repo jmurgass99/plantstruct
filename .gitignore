@@ -8,3 +8,6 @@ dist/
 .venv/
 
 # herramientas locales de agentes
+
+# visor web (npm)
+web/node_modules/
