@@ -11,3 +11,7 @@ dist/
 
 # visor web (npm)
 web/node_modules/
+
+# salida de los ejemplos
+examples/output/
+examples/out/
