@@ -1,9 +1,0 @@
-Tanque D = 20 m, H = 15 m, t_u = 8 mm, agua: W_p = 46,213 kN; manto 631 kN, techo 123 kN
-  W_i =    32,790 kN  (W_i/W_p = 0.7096)   X_i = 5.625 m  (X_i/H = 0.3750)
-  W_c =    14,057 kN  (W_c/W_p = 0.3042)   X_c = 10.204 m  (X_c/H = 0.6803)
-  T_i = 0.227 s  (C_i = 6.06, H/R = 1.50)      T_c = 4.67 s
-  V   = sqrt([A_i·(W_s + W_r + W_i)]² + [A_c·W_c]²) = 10,161 kN
-  M_rw = sqrt([A_i·(W_i·X_i + W_s·X_s + W_r·X_r)]² + [A_c·W_c·X_c]²) = 59,204 kN·m
-
-Sin manto ni techo: V = 9,937 kN, M_rw = 57,162 kN·m (la suma lineal daría 69,677 kN·m).
-T_i = 0,23 s cae en la meseta del espectro; T_c = 4,7 s está en la rama de periodo largo, de ahí que A_c sea tan pequeño.

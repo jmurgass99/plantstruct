@@ -1,8 +1,0 @@
-μ = 0.20: fricción μ·P = 120 kN frente a V = 180 kN → llave requerida: True
-  llave 200 × 75 × 25 mm: aplastamiento 207 kN, cortante chapa 562 kN → is_ok = True
-  placa N = 400, B = 300, t = 24.5 mm; T_u = 0.0 kN; estado VERIFICADO, cumple = True
-
-μ = 0.40: fricción μ·P = 240 kN frente a V = 180 kN → llave requerida: False
-  placa N = 400, B = 300, t = 24.5 mm; T_u = 0.0 kN; estado VERIFICADO, cumple = True
-
-dims_source: ENTRADA FIJA: altura 75 mm y espesor 25 mm son constantes del modulo, NO un dimensionamiento. Solo el ancho se ata a la geometria de la plac…
